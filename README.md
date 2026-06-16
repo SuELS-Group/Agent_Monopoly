@@ -70,30 +70,3 @@ This repository currently features the complete physics engine, the visualizer, 
 * **Agent Personas:** Inject specific behavioral prompts (e.g., Aggressive vs. Conservative) to study outcome probabilities.
 
 ```
-
----
-
-### 🐙 3. Les Commandes Git (Le Push vers GitHub)
-
-Ouvre ton terminal à la racine de ton nouveau dossier `C:\Monopoly-AI-Agents\`.
-
-Exécute ces commandes les unes à la suite des autres pour initialiser le dépôt, lier ton repo GitHub, et pousser tout le code :
-
-```bash
-# Initialise le dépôt Git local
-git init
-
-# Ajoute tous les fichiers (Backend, Frontend, Docs et README)
-git add .
-
-# Crée le premier commit officiel
-git commit -m "Initial commit: Complete Monopoly MAS Engine, Live Dashboard, and Analytics Tool"
-
-# Lie ton dossier local à ton repository distant GitHub
-git remote add origin https://github.com/MamatorHack/Monopoly-AI-Agents.git
-
-# Assure-toi d'être sur la branche principale (main)
-git branch -M main
-
-# Pousse le code vers GitHub
-git push -u origin main
