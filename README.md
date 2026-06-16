@@ -68,5 +68,3 @@ This repository currently features the complete physics engine, the visualizer, 
 * **Connect Local LLMs:** Replace `MockAgent` with real local instances of Llama 3 / Mistral / Gemma via the Ollama API to observe genuine reasoning.
 * **Implement Continuous Learning (RAG):** Finalize the `Post-Mortem` self-reflection module, allowing agents to write strategic rules into a persistent JSON memory upon bankruptcy to evolve across multiple sessions.
 * **Agent Personas:** Inject specific behavioral prompts (e.g., Aggressive vs. Conservative) to study outcome probabilities.
-
-```
