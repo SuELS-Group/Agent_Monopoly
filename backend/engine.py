@@ -3,7 +3,7 @@ import json
 from enum import Enum
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Tuple
-from agent import MockAgent
+from agent import OllamaAgent
 
 class SpaceType(Enum):
     SPECIAL = "Special"             # Go, Jail, Free Parking, Go to Jail
@@ -112,6 +112,7 @@ def create_classic_board() -> List[Space]:
 class Player:
     id: int
     name: str
+    model_name: str = "llama3"
     balance: int = 1500
     position: int = 0
     is_bankrupt: bool = False
@@ -163,7 +164,7 @@ class GameEngine:
         # --- JAIL DECISION PHASE ---
         if player.is_in_jail:
             prompt_json = self.export_state_for_llm(player.id, player.position, "jail_decision")
-            ai_agent = MockAgent(agent_id=player.id, name=player.name)
+            ai_agent = OllamaAgent(agent_id=player.id, name=player.name, model_name=player.model_name)
             response = ai_agent.query_llm(prompt_json)
 
             self.state.logs.append(f"{log_prefix} [AI THOUGHT] : {response.get('chain_of_thought')}")
@@ -269,8 +270,7 @@ class GameEngine:
                 # --- AI DECISION FLOW ---
                 # A. Tell the AI we are specifically trying to buy a property
                 prompt_json = self.export_state_for_llm(player.id, space_id, "buy_property")
-                
-                ai_agent = MockAgent(agent_id=player.id, name=player.name, persona="balanced")
+                ai_agent = OllamaAgent(agent_id=player.id, name=player.name, model_name=player.model_name)
                 response = ai_agent.query_llm(prompt_json)
                 
                 self.state.logs.append(f"{log_prefix} [AI THOUGHT] : {response.get('chain_of_thought', 'No thought logged.')}")
@@ -309,10 +309,6 @@ class GameEngine:
             
         self.state.current_player_id = next_id
         self.state.turn_number += 1
-
-    def export_state_for_llm(self) -> str:
-        # Note: Added the proper signature based on the usage in code
-        pass
 
     def export_state_for_llm(self, player_id: int, space_id: int, action_type: str) -> str:
         """Exports the raw game state. Zero strategic help, just facts."""
@@ -498,8 +494,8 @@ class GameEngine:
             self.state.logs.append(f"{log_prefix} : {bankrupt_player.name} is ruined by the Bank. Properties return to the market.")
         
         # --- TRIGGER POST-MORTEM ---
-        from agent import MockAgent
-        dying_agent = MockAgent(agent_id=bankrupt_player.id, name=bankrupt_player.name)
+        from agent import OllamaAgent
+        dying_agent = OllamaAgent(agent_id=bankrupt_player.id, name=bankrupt_player.name, model_name=bankrupt_player.model_name)
         
         context_logs = self.state.logs[-15:] 
         dying_agent.trigger_post_mortem(context_logs)
@@ -511,7 +507,7 @@ class GameEngine:
         while True:
             # Tell the AI it is in the management phase, not buying
             prompt_json = self.export_state_for_llm(active_player.id, active_player.position, "management")
-            ai_agent = MockAgent(agent_id=active_player.id, name=active_player.name)
+            ai_agent = OllamaAgent(agent_id=active_player.id, name=active_player.name, model_name=active_player.model_name)
             agent_decision = ai_agent.query_llm(prompt_json)
             
             action = agent_decision.get("action", "pass")
@@ -626,7 +622,7 @@ class GameEngine:
         for p in active_players:
             # Tell the AI it is in an auction context
             prompt_json = self.export_state_for_llm(p.id, space_id, "auction_bid")
-            ai_agent = MockAgent(agent_id=p.id, name=p.name)
+            ai_agent = OllamaAgent(agent_id=p.id, name=p.name, model_name=p.model_name)
             response = ai_agent.query_llm(prompt_json)
 
             bid_amount = response.get("bid", 0)

@@ -25,8 +25,8 @@ async def simulation_endpoint(websocket: WebSocket):
     await websocket.accept()
     
     # Initialize environment
-    player1 = Player(id=0, name="Agent_Alpha")
-    player2 = Player(id=1, name="Agent_Beta")
+    player1 = Player(id=0, name="Agent_Alpha", model_name="llama3")
+    player2 = Player(id=1, name="Agent_Beta", model_name="mistral")
     state = GameState(players=[player1, player2])
     engine = GameEngine(state)
     
