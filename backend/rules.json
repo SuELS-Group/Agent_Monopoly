@@ -1,0 +1,46 @@
+{
+  "GOAL": "Be the last player remaining in the game by bankrupting all other opponents.",
+  "MOVEMENT_AND_DICE": {
+    "Normal_Turn": "Roll 2 dice. Move that many spaces.",
+    "Doubles": "If you roll a double, you take your turn, then roll again. If you roll 3 doubles in a row, you go directly to Jail immediately without passing Go."
+  },
+  "GO_SPACE": {
+    "Rule": "Every time you land on or pass over the 'Go' space, the Bank pays you $200."
+  },
+  "PROPERTIES_AND_AUCTIONS": {
+    "Unowned_Property": "If you land on an unowned property, you can buy it at the printed base price.",
+    "Auction": "If you choose NOT to buy it, the property is immediately auctioned to the highest bidder. ANY player can bid, including the player who passed on the initial purchase."
+  },
+  "RENT_AND_MONOPOLIES": {
+    "Paying_Rent": "If you land on an opponent's unmortgaged property, you must pay rent based on the property's development level.",
+    "Monopoly_Multiplier": "If a player owns ALL properties of a color group, the rent for UNIMPROVED properties in that group is DOUBLED.",
+    "Railroads": "Rent depends on how many Railroads the owner holds (1=$25, 2=$50, 3=$100, 4=$200).",
+    "Utilities": "Rent is a multiplier of the dice roll. If 1 is owned: 4x the roll. If both are owned: 10x the roll."
+  },
+  "JAIL_MECHANICS": {
+    "Going_to_Jail": "You go to jail if you land on 'Go To Jail', draw a 'Go to Jail' card, or roll 3 consecutive doubles. You do not collect $200.",
+    "Getting_Out": "1) Pay $50 bail before rolling. 2) Roll doubles on your turn. 3) Use a 'Get out of Jail Free' card. If you don't roll doubles by your 3rd turn in Jail, you MUST pay $50.",
+    "While_in_Jail": "You CAN still collect rent, buy properties in auctions, trade, build, and mortgage while in Jail."
+  },
+  "BUILDING_HOUSES_AND_HOTELS": {
+    "Prerequisite": "You MUST own all properties of a color group (a Monopoly) before building.",
+    "Even_Build_Rule": "You MUST build evenly. You cannot have 2 houses on one property if another in the same group has 0. You must upgrade them simultaneously.",
+    "Hotels": "To buy a Hotel, you must first have 4 houses on the property. A Hotel replaces the 4 houses.",
+    "Selling_Buildings": "Buildings can be sold back to the Bank at any time for HALF their purchase price (must be sold evenly)."
+  },
+  "MORTGAGES": {
+    "Rule": "You can mortgage an unimproved property to receive 50% of its base price from the Bank. Mortgaged properties collect $0 rent.",
+    "Constraint": "You CANNOT mortgage a property if ANY property in its color group has houses. All houses must be sold first.",
+    "Unmortgaging": "To lift a mortgage, you must pay the Bank the mortgage value plus 10% interest."
+  },
+  "BANKRUPTCY": {
+    "Rule": "If you owe more money than you can pay (using cash, selling buildings, and mortgaging), you are Bankrupt.",
+    "To_Another_Player": "If you owe a player, they get all your cash and mortgaged/unmortgaged properties.",
+    "To_The_Bank": "If you owe the Bank (taxes/cards), all your properties are auctioned off to the remaining players."
+  },
+  "TRADING_AND_NEGOTIATION": {
+    "Rule": "You can trade unimproved properties, railroads, and utilities with ANY player for cash or other properties.",
+    "Constraint": "You CANNOT trade properties that have buildings. If you want to trade a property from a color group that has buildings, you must sell ALL buildings in that group back to the Bank first.",
+    "Strategy": "Use trades to complete your color monopolies, or to acquire key blocking properties. DO NOT accept a trade if it gives your opponent a dangerous monopoly without adequate compensation."
+  }
+}

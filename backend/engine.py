@@ -6,28 +6,28 @@ from typing import List, Optional, Dict, Tuple
 from agent import OllamaAgent
 
 class SpaceType(Enum):
-    SPECIAL = "Special"             # Go, Jail, Free Parking, Go to Jail
-    STREET = "Street"               # Standard streets
-    RAILROAD = "Railroad"           # 4 Railroads
-    UTILITY = "Utility"             # Water Works and Electric Company
-    TAX = "Tax"                     # Income and Luxury Tax
-    CHANCE = "Chance"               # Chance cards
-    CHEST = "Community Chest"       # Community Chest
+    SPECIAL = "Special"
+    STREET = "Street"
+    RAILROAD = "Railroad"
+    UTILITY = "Utility"
+    TAX = "Tax"
+    CHANCE = "Chance"
+    CHEST = "Community Chest"
 
 class CardAction(Enum):
     PAY_MONEY = "pay_money"
     RECEIVE_MONEY = "receive_money"
     MOVE_TO_SPACE = "move_to_space"
     MOVE_RELATIVE = "move_relative"
-    PROPERTY_REPAIRS = "property_repairs" # The ultimate AI trap!
+    PROPERTY_REPAIRS = "property_repairs"
 
 @dataclass
 class Card:
     text: str
     action: CardAction
-    value: int = 0  # Amount of money, or space ID, or relative movement
-    house_cost: int = 0 # For repairs
-    hotel_cost: int = 0 # For repairs
+    value: int = 0  
+    house_cost: int = 0 
+    hotel_cost: int = 0 
 
 def create_chance_deck() -> List[Card]:
     return [
@@ -56,15 +56,14 @@ class Space:
     name: str
     space_type: SpaceType
     color: Optional[str] = None     
-    price: int = 0                  
+    price: int = 0                 
     rent: List[int] = field(default_factory=list)  
     house_cost: int = 0             
     owner_id: Optional[int] = None  
-    buildings: int = 0              # 0-4 houses, 5 = Hotel
+    buildings: int = 0              
     is_mortgaged: bool = False
 
 def create_classic_board() -> List[Space]:
-    """Generates the official 40 spaces of the US Classic Monopoly board."""
     return [
         Space(0, "Go", SpaceType.SPECIAL),
         Space(1, "Mediterranean Avenue", SpaceType.STREET, "Brown", 60, [2, 10, 30, 90, 160, 250], 50),
@@ -120,16 +119,6 @@ class Player:
     turns_in_jail: int = 0
 
 @dataclass
-class TradeOffer:
-    sender_id: int
-    target_id: int
-    properties_offered: List[int] = field(default_factory=list)
-    cash_offered: int = 0
-    properties_requested: List[int] = field(default_factory=list)
-    cash_requested: int = 0
-    justification: str = "" 
-
-@dataclass
 class GameState:
     turn_number: int = 1
     current_player_id: int = 0
@@ -145,11 +134,9 @@ class GameEngine:
         self.state = state
 
     def roll_dice(self) -> Tuple[int, int]:
-        """Generates a deterministic 2-dice roll for the simulation."""
         return random.randint(1, 6), random.randint(1, 6)
 
     def execute_turn(self) -> None:
-        """Executes the complete routine of a player's turn."""
         if not self.state.players:
             return
 
@@ -178,7 +165,6 @@ class GameEngine:
                 self.state.logs.append(f"{log_prefix} decides to stay in Jail and roll for a double.")
 
         # --- MANAGEMENT PHASE ---
-        # Note: In official rules, you can still trade/build while in jail!
         self._management_phase(player)
 
         # 1. Dice Roll
@@ -195,7 +181,7 @@ class GameEngine:
                 self.state.logs.append(f"{log_prefix} rolled a double and escapes Jail for free!")
                 player.is_in_jail = False
                 player.turns_in_jail = 0
-                self.state.consecutive_doubles = 0 # Double used to escape does not grant a replay
+                self.state.consecutive_doubles = 0 
             elif player.turns_in_jail >= 3:
                 self.state.logs.append(f"{log_prefix} has been in Jail for 3 turns. Forced to pay $50.")
                 player.balance -= 50
@@ -209,7 +195,7 @@ class GameEngine:
                 self._advance_turn()
                 return
 
-        # 2. Check the 3-doubles rule (Only if not escaping jail this turn)
+        # 2. Check the 3-doubles rule
         if is_double and not player.is_in_jail and player.turns_in_jail == 0:
             self.state.consecutive_doubles += 1
             if self.state.consecutive_doubles == 3:
@@ -243,15 +229,12 @@ class GameEngine:
             self.state.logs.append(f"{log_prefix} gets to roll again due to a double.")
 
     def _evaluate_space(self, player: Player, space_id: int, dice_roll: int) -> None:
-        """Applies the economic rules of the landed space."""
         space = self.state.board[space_id]
         log_prefix = f"[LOG][Turn {self.state.turn_number}] {player.name}"
 
-        # 1. Tax and Jail Handling
         if space.space_type == SpaceType.TAX:
             player.balance -= space.price
             self.state.logs.append(f"{log_prefix} pays the '{space.name}' of ${space.price} (Balance: ${player.balance}).")
-            
             if player.balance < 0:
                 self._declare_bankruptcy(player, None)
         
@@ -264,11 +247,8 @@ class GameEngine:
         elif space.space_type in [SpaceType.CHANCE, SpaceType.CHEST]:
             self._draw_card(player, space.space_type, dice_roll)    
 
-        # 2. Property Handling (Purchase or Rent)
         elif space.space_type in [SpaceType.STREET, SpaceType.RAILROAD, SpaceType.UTILITY]:
             if space.owner_id is None:
-                # --- AI DECISION FLOW ---
-                # A. Tell the AI we are specifically trying to buy a property
                 prompt_json = self.export_state_for_llm(player.id, space_id, "buy_property")
                 ai_agent = OllamaAgent(agent_id=player.id, name=player.name, model_name=player.model_name)
                 response = ai_agent.query_llm(prompt_json)
@@ -295,7 +275,6 @@ class GameEngine:
                     self._declare_bankruptcy(player, owner)
 
     def _advance_turn(self) -> None:
-        """Cycles to the next active player and increments the game clock."""
         num_players = len(self.state.players)
         if num_players == 0:
             return
@@ -310,11 +289,42 @@ class GameEngine:
         self.state.current_player_id = next_id
         self.state.turn_number += 1
 
-    def export_state_for_llm(self, player_id: int, space_id: int, action_type: str) -> str:
-        """Exports the raw game state. Zero strategic help, just facts."""
+    def export_state_for_llm(self, player_id: int, space_id: int, action_type: str, locked_spaces: set = None, trade_offer: dict = None) -> str:
+        if locked_spaces is None:
+            locked_spaces = set()
+            
         player = next(p for p in self.state.players if p.id == player_id)
         current_space = self.state.board[space_id]
         
+        legal_actions = {}
+        if action_type == "buy_property":
+            legal_actions = {"allowed_actions": ["buy", "pass"]} if player.balance >= current_space.price else {"allowed_actions": ["pass"]}
+        elif action_type == "auction_bid":
+            legal_actions = {
+                "allowed_actions": ["bid", "pass"], 
+                "max_bid_possible_due_to_liquidity": player.balance,
+                "property_base_price": current_space.price,
+                "WARNING": f"Do not bid your entire balance! Bidding significantly more than the base_price (${current_space.price}) is mathematically ruinous."
+            }
+        elif action_type == "jail_decision":
+            legal_actions = {"allowed_actions": ["pay_bail", "wait"]} if player.balance >= 50 else {"allowed_actions": ["wait"]}
+        elif action_type == "evaluate_trade":
+            legal_actions = {"allowed_actions": ["accept_trade", "reject_trade"]}
+        elif action_type == "management":
+            # Propriétés n'ayant pas de bâtiments dans leur groupe de couleur
+            tradeable_owned = [s.id for s in self.state.board if s.owner_id == player.id and not any(other.buildings > 0 for other in self.state.board if other.color == s.color)]
+            tradeable_others = [s.id for s in self.state.board if s.owner_id is not None and s.owner_id != player.id and not any(other.buildings > 0 for other in self.state.board if other.color == s.color)]
+            
+            legal_actions = {
+                "allowed_actions": ["pass", "build", "mortgage", "unmortgage", "propose_trade"],
+                "valid_targets_for_build": [s.id for s in self.state.board if s.owner_id == player.id and s.space_type == SpaceType.STREET and self._has_monopoly(s.color, player.id) and s.buildings < 5 and player.balance >= s.house_cost and s.id not in locked_spaces],
+                "valid_targets_for_mortgage": [s.id for s in self.state.board if s.owner_id == player.id and not s.is_mortgaged and s.buildings == 0 and s.id not in locked_spaces],
+                "valid_targets_for_unmortgage": [s.id for s in self.state.board if s.owner_id == player.id and s.is_mortgaged and player.balance >= int((s.price // 2) * 1.1) and s.id not in locked_spaces],
+                "valid_opponents_for_trade": [p.id for p in self.state.players if p.id != player.id and not p.is_bankrupt],
+                "your_tradeable_properties": tradeable_owned,
+                "opponents_tradeable_properties": tradeable_others
+            }
+
         market_status = [
             {
                 "id": s.id, 
@@ -330,40 +340,51 @@ class GameEngine:
             } 
             for s in self.state.board if s.price > 0
         ]
+        
+        opponents = [
+            {
+                "id": p.id,
+                "name": p.name,
+                "balance": p.balance,
+                "position": p.position,
+                "is_in_jail": p.is_in_jail
+            }
+            for p in self.state.players if p.id != player_id and not p.is_bankrupt
+        ]
 
         llm_context = {
             "game_turn": self.state.turn_number,
-            "action_required": action_type, # <-- Now dynamic
+            "action_required": action_type,
+            "legal_actions": legal_actions,
+            "trade_offer_to_evaluate": trade_offer,
             "your_agent": {
                 "id": player.id,
                 "name": player.name,
                 "balance": player.balance,
                 "position": player.position
             },
+            "opponents_overview": opponents,
             "space_details": {
                 "id": current_space.id,
                 "name": current_space.name,
                 "base_price": current_space.price,
-                "type": current_space.space_type.value
+                "type": current_space.space_type.value,
+                "owner": current_space.owner_id
             },
-            "market_overview": market_status,
-            "recent_logs": self.state.logs[-5:]
+            "market_overview": market_status
         }
         
         return json.dumps(llm_context, indent=2, ensure_ascii=False)
     
     def _has_monopoly(self, color: str, owner_id: int) -> bool:
-        """Checks if a player owns all streets of a specific color."""
         color_group = [s for s in self.state.board if s.color == color]
         return all(s.owner_id == owner_id for s in color_group)
 
     def _calculate_rent(self, space: Space, dice_roll: int, owner: Player) -> int:
-        """Calculates exact rent based on property type, monopolies, and buildings."""
         if space.is_mortgaged:
-            return 0 # NOUVEAU: Aucun loyer si hypothéqué
+            return 0 
             
         if space.space_type == SpaceType.STREET:
-            # If no buildings but player has monopoly, rent is doubled
             if space.buildings == 0 and space.color and self._has_monopoly(space.color, owner.id):
                 return space.rent[0] * 2
             return space.rent[space.buildings]
@@ -380,11 +401,9 @@ class GameEngine:
         return 0
     
     def _draw_card(self, player: Player, deck_type: SpaceType, dice_roll: int) -> None:
-        """Draws a card and applies its effects."""
         deck_name = "Chance" if deck_type == SpaceType.CHANCE else "Community Chest"
         deck = self.state.chance_deck if deck_type == SpaceType.CHANCE else self.state.chest_deck
         
-        # Draw a random card
         card = random.choice(deck)
         log_prefix = f"[LOG][Turn {self.state.turn_number}] 🃏 CARD ({deck_name})"
         self.state.logs.append(f"{log_prefix} : {player.name} draws -> '{card.text}'")
@@ -403,17 +422,14 @@ class GameEngine:
             old_position = player.position
             player.position = card.value
             
-            # Going to Jail logic
             if card.value == 10:
                 player.is_in_jail = True
                 self.state.consecutive_doubles = 0
                 self.state.logs.append(f"{log_prefix} : {player.name} goes directly to Jail.")
-            # Passing Go logic (only if moving forward and not going to jail)
-            elif card.value < old_position and old_position != 36: # Exclude Chance 36 to Go
+            elif card.value < old_position and old_position != 36: 
                  player.balance += 200
                  self.state.logs.append(f"{log_prefix} : {player.name} passes Go and collects $200.")
                  
-            # Re-evaluate the new space!
             if card.value != 10:
                 self._evaluate_space(player, player.position, dice_roll)
 
@@ -437,11 +453,6 @@ class GameEngine:
                 self.state.logs.append(f"{log_prefix} : {player.name} owns no buildings. Pays $0.")
     
     def _process_build(self, player: Player, space_id: int) -> bool:
-        """
-        Attempts to build a house/hotel on a given space. 
-        Enforces Monopoly rules (monopoly ownership, even building, funds).
-        Returns True if successful, False otherwise.
-        """
         space = self.state.board[space_id]
         log_prefix = f"[LOG][Turn {self.state.turn_number}] 🏗️ CONSTRUCTION"
 
@@ -461,14 +472,12 @@ class GameEngine:
             self.state.logs.append(f"{log_prefix} : {player.name} lacks funds to build on {space.name} (${space.house_cost} needed).")
             return False
 
-        # Even Build Rule: Cannot build if another property in the color group has fewer buildings
         color_group = [s for s in self.state.board if s.color == space.color]
         min_buildings_in_group = min(s.buildings for s in color_group)
         if space.buildings > min_buildings_in_group:
             self.state.logs.append(f"{log_prefix} : {player.name} must build evenly. Cannot add house to {space.name} yet.")
             return False
 
-        # Execute construction
         player.balance -= space.house_cost
         space.buildings += 1
         building_type = "a House" if space.buildings < 5 else "a Hotel"
@@ -476,7 +485,6 @@ class GameEngine:
         return True
 
     def _declare_bankruptcy(self, bankrupt_player: Player, creditor: Optional[Player]) -> None:
-        """Handles player elimination and asset transfer."""
         bankrupt_player.is_bankrupt = True
         
         for space in self.state.board:
@@ -493,7 +501,6 @@ class GameEngine:
         else:
             self.state.logs.append(f"{log_prefix} : {bankrupt_player.name} is ruined by the Bank. Properties return to the market.")
         
-        # --- TRIGGER POST-MORTEM ---
         from agent import OllamaAgent
         dying_agent = OllamaAgent(agent_id=bankrupt_player.id, name=bankrupt_player.name, model_name=bankrupt_player.model_name)
         
@@ -501,80 +508,116 @@ class GameEngine:
         dying_agent.trigger_post_mortem(context_logs)
 
     def _management_phase(self, active_player: Player) -> None:
-        """Allows the agent to execute transactions before rolling the dice."""
-        log_prefix = f"[LOG][Turn {self.state.turn_number}] 🧠 MANAGEMENT PHASE ({active_player.name})"
+        log_prefix_action = f"[LOG][Turn {self.state.turn_number}] 🧠 MANAGEMENT PHASE ({active_player.name})"
+        log_prefix_thought = f"[LOG][Turn {self.state.turn_number}] {active_player.name}"
         
-        while True:
-            # Tell the AI it is in the management phase, not buying
-            prompt_json = self.export_state_for_llm(active_player.id, active_player.position, "management")
+        actions_taken = 0
+        max_actions = 10 
+        locked_spaces = set() 
+        traded_opponents = set()
+        
+        while actions_taken < max_actions:
+            prompt_json = self.export_state_for_llm(active_player.id, active_player.position, "management", locked_spaces)
             ai_agent = OllamaAgent(agent_id=active_player.id, name=active_player.name, model_name=active_player.model_name)
             agent_decision = ai_agent.query_llm(prompt_json)
+            
+            thought = agent_decision.get("chain_of_thought", "No thought logged.")
+            self.state.logs.append(f"{log_prefix_thought} [AI THOUGHT] : {thought}")
             
             action = agent_decision.get("action", "pass")
             
             if action == "pass":
                 break 
                 
-            elif action == "build":
-                target_space_id = agent_decision.get("target_space_id")
-                self.state.logs.append(f"{log_prefix} : [AI THOUGHT] {agent_decision.get('chain_of_thought')}")
-                success = self._process_build(active_player, target_space_id)
-                if not success:
-                    break # Break if build fails to avoid infinite loop
-
-            elif action == "trade":
-                trade_details = agent_decision["trade_details"]
-                target_id = trade_details["target_agent_id"]
-                self._process_trade(active_player, target_id, trade_details)
-                break 
-
-            elif action == "mortgage":
-                target_space_id = agent_decision.get("target_space_id")
-                self.state.logs.append(f"{log_prefix} : [AI THOUGHT] {agent_decision.get('chain_of_thought')}")
-                success = self._process_mortgage(active_player, target_space_id)
-                if not success:
+            elif action == "propose_trade":
+                target_id = agent_decision.get("target_agent_id")
+                if target_id is None or target_id in traded_opponents:
+                    self.state.logs.append(f"{log_prefix_action} : Invalid trade target or already traded this turn. Forced to pass.")
                     break
-
-            elif action == "unmortgage":
-                target_space_id = agent_decision.get("target_space_id")
-                self.state.logs.append(f"{log_prefix} : [AI THOUGHT] {agent_decision.get('chain_of_thought')}")
-                success = self._process_unmortgage(active_player, target_space_id)
-                if not success:
-                    break
-            
-            else:
-                # FAILSAFE: If the AI hallucinates an unknown action, force it to pass
-                self.state.logs.append(f"{log_prefix} : AI returned invalid action '{action}'. Ending phase.")
-                break
-
-    def _process_trade(self, sender: Player, target_id: int, trade_details: dict) -> None:
-        """Queries the target agent and executes the transfer if accepted."""
-        target_player = next(p for p in self.state.players if p.id == target_id)
-        log_prefix = f"[LOG][Turn {self.state.turn_number}] 🤝 NEGOTIATION"
-        
-        offered_cash = trade_details["offer"]["cash"]
-        requested_cash = trade_details["request"]["cash"]
-        self.state.logs.append(f"{log_prefix} : {sender.name} proposes a trade to {target_player.name} (+${offered_cash} against -${requested_cash} and properties).")
-
-        # --- TARGET AGENT RESPONSE ---
-        target_accepts = False 
-        
-        if target_accepts:
-            self.state.logs.append(f"{log_prefix} : {target_player.name} ACCEPTS the offer!")
-            
-            sender.balance = sender.balance - offered_cash + requested_cash
-            target_player.balance = target_player.balance + offered_cash - requested_cash
-            
-            for prop_id in trade_details["offer"]["property_ids"]:
-                self.state.board[prop_id].owner_id = target_player.id
-            for prop_id in trade_details["request"]["property_ids"]:
-                self.state.board[prop_id].owner_id = sender.id
                 
+                success = self._process_trade_proposal(active_player, target_id, agent_decision)
+                traded_opponents.add(target_id)
+                actions_taken += 1
+                if not success:
+                    break
+
+            elif action in ["build", "mortgage", "unmortgage"]:
+                target_space_id = agent_decision.get("target_space_id")
+                
+                if target_space_id is None or not isinstance(target_space_id, int) or target_space_id < 0 or target_space_id > 39:
+                    self.state.logs.append(f"{log_prefix_action} : Hallucination prevented (invalid ID '{target_space_id}'). Forced to pass.")
+                    break
+                
+                if target_space_id in locked_spaces:
+                    self.state.logs.append(f"{log_prefix_action} : AI tried to interact with space {target_space_id} multiple times. Forced to pass.")
+                    break
+                    
+                if action == "build":
+                    success = self._process_build(active_player, target_space_id)
+                elif action == "mortgage":
+                    success = self._process_mortgage(active_player, target_space_id)
+                else:
+                    success = self._process_unmortgage(active_player, target_space_id)
+                    
+                if not success:
+                    break 
+                
+                locked_spaces.add(target_space_id)
+                actions_taken += 1
+            else:
+                self.state.logs.append(f"{log_prefix_action} : AI returned invalid action '{action}'. Ending phase.")
+                break
+                
+        if actions_taken >= max_actions:
+            self.state.logs.append(f"{log_prefix_action} : AI reached the maximum of {max_actions} management actions. Moving to dice roll.")
+
+    def _process_trade_proposal(self, proposer: Player, target_id: int, decision: dict) -> bool:
+        log_prefix = f"[LOG][Turn {self.state.turn_number}] 🤝 TRADE"
+        target_player = next((p for p in self.state.players if p.id == target_id and not p.is_bankrupt), None)
+        
+        if not target_player:
+            return False
+            
+        offer_cash = int(decision.get("offer_cash", 0))
+        offer_props = decision.get("offer_properties", [])
+        req_props = decision.get("request_properties", [])
+        
+        if offer_cash > proposer.balance or offer_cash < 0:
+            self.state.logs.append(f"{log_prefix} : {proposer.name} offered illegal cash amount. Trade cancelled.")
+            return False
+            
+        for pid in offer_props:
+            if self.state.board[pid].owner_id != proposer.id: return False
+        for pid in req_props:
+            if self.state.board[pid].owner_id != target_player.id: return False
+
+        trade_details = {
+            "proposer_name": proposer.name,
+            "offered_cash": offer_cash,
+            "offered_properties": [self.state.board[p].name for p in offer_props],
+            "requested_properties": [self.state.board[p].name for p in req_props]
+        }
+        
+        self.state.logs.append(f"{log_prefix} : {proposer.name} PROPOSES a trade to {target_player.name} -> Offers ${offer_cash} + {trade_details['offered_properties']} for {trade_details['requested_properties']}")
+
+        prompt_json = self.export_state_for_llm(target_player.id, target_player.position, "evaluate_trade", trade_offer=trade_details)
+        target_agent = OllamaAgent(agent_id=target_player.id, name=target_player.name, model_name=target_player.model_name)
+        target_decision = target_agent.query_llm(prompt_json)
+        
+        self.state.logs.append(f"[LOG][Turn {self.state.turn_number}] {target_player.name} [AI THOUGHT] : {target_decision.get('chain_of_thought', '...')}")
+        
+        if target_decision.get("action") == "accept_trade":
+            proposer.balance -= offer_cash
+            target_player.balance += offer_cash
+            for pid in offer_props: self.state.board[pid].owner_id = target_player.id
+            for pid in req_props: self.state.board[pid].owner_id = proposer.id
+            self.state.logs.append(f"{log_prefix} : ✅ {target_player.name} ACCEPTS the trade!")
+            return True
         else:
-            self.state.logs.append(f"{log_prefix} : {target_player.name} REJECTS the offer.")
+            self.state.logs.append(f"{log_prefix} : ❌ {target_player.name} REJECTS the trade.")
+            return False
 
     def _process_mortgage(self, player: Player, space_id: int) -> bool:
-        """Executes a mortgage on a property (grants 50% of base price in cash)."""
         space = self.state.board[space_id]
         log_prefix = f"[LOG][Turn {self.state.turn_number}] 🏦 BANK"
         
@@ -592,7 +635,6 @@ class GameEngine:
         return True
 
     def _process_unmortgage(self, player: Player, space_id: int) -> bool:
-        """Lifts a mortgage by paying the value + 10% interest."""
         space = self.state.board[space_id]
         log_prefix = f"[LOG][Turn {self.state.turn_number}] 🏦 BANK"
         
@@ -610,35 +652,43 @@ class GameEngine:
         return True    
 
     def _execute_auction(self, space_id: int) -> None:
-        """Executes a single-round sealed-bid auction for an unowned property."""
         space = self.state.board[space_id]
         log_prefix = f"[LOG][Turn {self.state.turn_number}] 🔨 AUCTION"
         self.state.logs.append(f"{log_prefix} : {space.name} is up for auction!")
 
         active_players = [p for p in self.state.players if not p.is_bankrupt]
         bids = {}
+        pending_logs = []
 
-        # 1. Collect sealed bids from all active players
         for p in active_players:
-            # Tell the AI it is in an auction context
             prompt_json = self.export_state_for_llm(p.id, space_id, "auction_bid")
             ai_agent = OllamaAgent(agent_id=p.id, name=p.name, model_name=p.model_name)
             response = ai_agent.query_llm(prompt_json)
 
-            bid_amount = response.get("bid", 0)
+            thought = response.get("chain_of_thought", "No thought logged.")
+            log_prefix_agent = f"[LOG][Turn {self.state.turn_number}] {p.name}"
+            pending_logs.append(f"{log_prefix_agent} [AI THOUGHT] : {thought}")
+
+            bid_amount = response.get("bid")
+            if bid_amount is None or not isinstance(bid_amount, (int, float)):
+                bid_amount = 0
+            else:
+                try:
+                    bid_amount = int(bid_amount)
+                except ValueError:
+                    bid_amount = 0
             
-            # Anti-cheat: AI cannot bid more than its liquid balance
             bid_amount = min(bid_amount, p.balance)
 
             if bid_amount > 0:
                 bids[p.id] = bid_amount
-                self.state.logs.append(f"{log_prefix} : {p.name} places a secret bid.")
+                pending_logs.append(f"{log_prefix} : {p.name} bids ${bid_amount} for the property.")
             else:
-                self.state.logs.append(f"{log_prefix} : {p.name} passes on the auction.")
+                pending_logs.append(f"{log_prefix} : {p.name} passes on the auction.")
 
-        # 2. Resolve the auction
+        self.state.logs.extend(pending_logs)
+
         if bids:
-            # Find the highest bidder
             highest_bidder_id = max(bids, key=bids.get)
             winning_bid = bids[highest_bidder_id]
             winner = next(p for p in self.state.players if p.id == highest_bidder_id)
