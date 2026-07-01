@@ -112,6 +112,7 @@ class Player:
     id: int
     name: str
     model_name: str = "llama3"
+    persona: str = "Neutral AI"
     balance: int = 1500
     position: int = 0
     is_bankrupt: bool = False
@@ -151,9 +152,12 @@ class GameEngine:
         # --- JAIL DECISION PHASE ---
         if player.is_in_jail:
             prompt_json = self.export_state_for_llm(player.id, player.position, "jail_decision")
-            ai_agent = OllamaAgent(agent_id=player.id, name=player.name, model_name=player.model_name)
+            ai_agent = OllamaAgent(agent_id=player.id, name=player.name, model_name=player.model_name, persona=player.persona)
             response = ai_agent.query_llm(prompt_json)
 
+            pub_msg = response.get("public_message")
+            if pub_msg: self.state.logs.append(f"[CHAT] 💬 {player.name} says: \"{pub_msg}\"")
+            
             self.state.logs.append(f"{log_prefix} [AI THOUGHT] : {response.get('chain_of_thought')}")
             
             if response.get("action") == "pay_bail" and player.balance >= 50:
@@ -250,8 +254,11 @@ class GameEngine:
         elif space.space_type in [SpaceType.STREET, SpaceType.RAILROAD, SpaceType.UTILITY]:
             if space.owner_id is None:
                 prompt_json = self.export_state_for_llm(player.id, space_id, "buy_property")
-                ai_agent = OllamaAgent(agent_id=player.id, name=player.name, model_name=player.model_name)
+                ai_agent = OllamaAgent(agent_id=player.id, name=player.name, model_name=player.model_name, persona=player.persona)
                 response = ai_agent.query_llm(prompt_json)
+                
+                pub_msg = response.get("public_message")
+                if pub_msg: self.state.logs.append(f"[CHAT] 💬 {player.name} says: \"{pub_msg}\"")
                 
                 self.state.logs.append(f"{log_prefix} [AI THOUGHT] : {response.get('chain_of_thought', 'No thought logged.')}")
                 
@@ -267,12 +274,27 @@ class GameEngine:
                 owner = next(p for p in self.state.players if p.id == space.owner_id)
                 rent = self._calculate_rent(space, dice_roll, owner)
                 
-                player.balance -= rent
-                owner.balance += rent
-                self.state.logs.append(f"{log_prefix} lands on {owner.name}'s property ({space.name}). Rent paid: ${rent} (Balance: ${player.balance}).")
-                
-                if player.balance < 0:
-                    self._declare_bankruptcy(player, owner)
+                if rent > 0:
+                    rent_context = {"target_name": player.name, "rent_amount": rent}
+                    prompt_json = self.export_state_for_llm(owner.id, space_id, "rent_decision", rent_context=rent_context)
+                    
+                    owner_agent = OllamaAgent(agent_id=owner.id, name=owner.name, model_name=owner.model_name, persona=owner.persona)
+                    owner_decision = owner_agent.query_llm(prompt_json)
+                    
+                    pub_msg = owner_decision.get("public_message")
+                    if pub_msg: self.state.logs.append(f"[CHAT] 💬 {owner.name} says: \"{pub_msg}\"")
+                    
+                    self.state.logs.append(f"[LOG][Turn {self.state.turn_number}] {owner.name} [AI THOUGHT] : {owner_decision.get('chain_of_thought', '...')}")
+                    
+                    if owner_decision.get("action") == "waive_rent":
+                        self.state.logs.append(f"{log_prefix} 🤝 COLLUSION : {owner.name} decides to WAIVE the ${rent} rent for {player.name} to build an alliance!")
+                    else:
+                        player.balance -= rent
+                        owner.balance += rent
+                        self.state.logs.append(f"{log_prefix} lands on {owner.name}'s property ({space.name}). Rent paid: ${rent} (Balance: ${player.balance}).")
+                        
+                        if player.balance < 0:
+                            self._declare_bankruptcy(player, owner)
 
     def _advance_turn(self) -> None:
         num_players = len(self.state.players)
@@ -289,7 +311,7 @@ class GameEngine:
         self.state.current_player_id = next_id
         self.state.turn_number += 1
 
-    def export_state_for_llm(self, player_id: int, space_id: int, action_type: str, locked_spaces: set = None, trade_offer: dict = None) -> str:
+    def export_state_for_llm(self, player_id: int, space_id: int, action_type: str, locked_spaces: set = None, trade_offer: dict = None, rent_context: dict = None) -> str:
         if locked_spaces is None:
             locked_spaces = set()
             
@@ -310,8 +332,9 @@ class GameEngine:
             legal_actions = {"allowed_actions": ["pay_bail", "wait"]} if player.balance >= 50 else {"allowed_actions": ["wait"]}
         elif action_type == "evaluate_trade":
             legal_actions = {"allowed_actions": ["accept_trade", "reject_trade"]}
+        elif action_type == "rent_decision":
+            legal_actions = {"allowed_actions": ["charge_rent", "waive_rent"]}
         elif action_type == "management":
-            # Propriétés n'ayant pas de bâtiments dans leur groupe de couleur
             tradeable_owned = [s.id for s in self.state.board if s.owner_id == player.id and not any(other.buildings > 0 for other in self.state.board if other.color == s.color)]
             tradeable_others = [s.id for s in self.state.board if s.owner_id is not None and s.owner_id != player.id and not any(other.buildings > 0 for other in self.state.board if other.color == s.color)]
             
@@ -357,6 +380,7 @@ class GameEngine:
             "action_required": action_type,
             "legal_actions": legal_actions,
             "trade_offer_to_evaluate": trade_offer,
+            "rent_context": rent_context,
             "your_agent": {
                 "id": player.id,
                 "name": player.name,
@@ -502,7 +526,7 @@ class GameEngine:
             self.state.logs.append(f"{log_prefix} : {bankrupt_player.name} is ruined by the Bank. Properties return to the market.")
         
         from agent import OllamaAgent
-        dying_agent = OllamaAgent(agent_id=bankrupt_player.id, name=bankrupt_player.name, model_name=bankrupt_player.model_name)
+        dying_agent = OllamaAgent(agent_id=bankrupt_player.id, name=bankrupt_player.name, model_name=bankrupt_player.model_name, persona=bankrupt_player.persona)
         
         context_logs = self.state.logs[-15:] 
         dying_agent.trigger_post_mortem(context_logs)
@@ -518,8 +542,11 @@ class GameEngine:
         
         while actions_taken < max_actions:
             prompt_json = self.export_state_for_llm(active_player.id, active_player.position, "management", locked_spaces)
-            ai_agent = OllamaAgent(agent_id=active_player.id, name=active_player.name, model_name=active_player.model_name)
+            ai_agent = OllamaAgent(agent_id=active_player.id, name=active_player.name, model_name=active_player.model_name, persona=active_player.persona)
             agent_decision = ai_agent.query_llm(prompt_json)
+            
+            pub_msg = agent_decision.get("public_message")
+            if pub_msg: self.state.logs.append(f"[CHAT] 💬 {active_player.name} says: \"{pub_msg}\"")
             
             thought = agent_decision.get("chain_of_thought", "No thought logged.")
             self.state.logs.append(f"{log_prefix_thought} [AI THOUGHT] : {thought}")
@@ -601,8 +628,11 @@ class GameEngine:
         self.state.logs.append(f"{log_prefix} : {proposer.name} PROPOSES a trade to {target_player.name} -> Offers ${offer_cash} + {trade_details['offered_properties']} for {trade_details['requested_properties']}")
 
         prompt_json = self.export_state_for_llm(target_player.id, target_player.position, "evaluate_trade", trade_offer=trade_details)
-        target_agent = OllamaAgent(agent_id=target_player.id, name=target_player.name, model_name=target_player.model_name)
+        target_agent = OllamaAgent(agent_id=target_player.id, name=target_player.name, model_name=target_player.model_name, persona=target_player.persona)
         target_decision = target_agent.query_llm(prompt_json)
+        
+        pub_msg = target_decision.get("public_message")
+        if pub_msg: self.state.logs.append(f"[CHAT] 💬 {target_player.name} says: \"{pub_msg}\"")
         
         self.state.logs.append(f"[LOG][Turn {self.state.turn_number}] {target_player.name} [AI THOUGHT] : {target_decision.get('chain_of_thought', '...')}")
         
@@ -662,8 +692,11 @@ class GameEngine:
 
         for p in active_players:
             prompt_json = self.export_state_for_llm(p.id, space_id, "auction_bid")
-            ai_agent = OllamaAgent(agent_id=p.id, name=p.name, model_name=p.model_name)
+            ai_agent = OllamaAgent(agent_id=p.id, name=p.name, model_name=p.model_name, persona=p.persona)
             response = ai_agent.query_llm(prompt_json)
+
+            pub_msg = response.get("public_message")
+            if pub_msg: pending_logs.append(f"[CHAT] 💬 {p.name} says: \"{pub_msg}\"")
 
             thought = response.get("chain_of_thought", "No thought logged.")
             log_prefix_agent = f"[LOG][Turn {self.state.turn_number}] {p.name}"

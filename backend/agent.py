@@ -4,10 +4,11 @@ import requests
 import re
 
 class OllamaAgent:
-    def __init__(self, agent_id: int, name: str, model_name: str = "llama3"):
+    def __init__(self, agent_id: int, name: str, model_name: str = "llama3", persona: str = "Neutral AI"):
         self.agent_id = agent_id
         self.name = name
         self.model_name = model_name
+        self.persona = persona
         
         self.memory_file = f"memory_{self.name.lower()}.json"
         self.rules_file = "rules.json"
@@ -39,23 +40,28 @@ class OllamaAgent:
         with open(self.memory_file, 'w', encoding='utf-8') as f:
             json.dump(self.memory[-5:], f, indent=4, ensure_ascii=False) 
 
-    def build_system_prompt(self, action_required: str, legal_actions: dict, trade_offer: dict = None) -> str:
+    def build_system_prompt(self, action_required: str, legal_actions: dict, trade_offer: dict = None, rent_context: dict = None) -> str:
         memory_text = json.dumps(self.memory, indent=2) if self.memory else "[]"
         rules_text = json.dumps(self.rules, indent=2)
         legal_actions_text = json.dumps(legal_actions, indent=2)
         
         schema_instructions = ""
-        trade_context = ""
+        extra_context = ""
+        
+        base_schema = '"public_message": "What you say out loud (Max 2 sentences). You CAN lie, bluff, and manipulate here to hide your true strategy, but you MUST NOT contradict the physical action you just took (e.g. if you accept, you can lie about WHY, but do not say you reject). Act strictly as your PERSONA."'
         
         if action_required == "buy_property":
-            schema_instructions = '{"current_situation": "1 sentence describing your position and funds", "chain_of_thought": "your independent strategic reasoning", "action": "buy" OR "pass"}'
+            schema_instructions = f'{{"current_situation": "1 sentence", "chain_of_thought": "your independent strategic reasoning", "action": "buy" OR "pass", {base_schema}}}'
         elif action_required == "auction_bid":
-            schema_instructions = '{"current_situation": "1 sentence describing your position and funds", "chain_of_thought": "your strategy for this auction", "action": "bid" OR "pass", "bid": integer}'
+            schema_instructions = f'{{"current_situation": "1 sentence", "chain_of_thought": "your strategy for this auction", "action": "bid" OR "pass", "bid": integer, {base_schema}}}'
         elif action_required == "jail_decision":
-            schema_instructions = '{"current_situation": "1 sentence describing your position and funds", "chain_of_thought": "your strategy: pay or wait", "action": "pay_bail" OR "wait"}'
+            schema_instructions = f'{{"current_situation": "1 sentence", "chain_of_thought": "your strategy: pay or wait", "action": "pay_bail" OR "wait", {base_schema}}}'
         elif action_required == "evaluate_trade":
-            trade_context = f"\n[INCOMING TRADE OFFER]\n{json.dumps(trade_offer, indent=2)}\n"
-            schema_instructions = '{"current_situation": "1 sentence", "chain_of_thought": "Evaluate the risk of giving them a monopoly vs the cash/properties offered", "action": "accept_trade" OR "reject_trade"}'
+            extra_context = f"\n[INCOMING TRADE OFFER]\n{json.dumps(trade_offer, indent=2)}\n"
+            schema_instructions = f'{{"current_situation": "1 sentence", "chain_of_thought": "Evaluate the risk of giving them a monopoly vs the cash/properties offered", "action": "accept_trade" OR "reject_trade", {base_schema}}}'
+        elif action_required == "rent_decision":
+            extra_context = f"\n[RENT DECISION]\nPlayer {rent_context['target_name']} landed on your property. Rent is ${rent_context['rent_amount']}. You can force them to pay, OR waive the rent to build a secret alliance against others.\n"
+            schema_instructions = f'{{"current_situation": "1 sentence", "chain_of_thought": "Decide if breaking the rule to forgive debt helps you long-term", "action": "charge_rent" OR "waive_rent", {base_schema}}}'
         elif action_required == "management":
             available_choices = ["pass"]
             if legal_actions.get("valid_targets_for_build"): available_choices.append("build")
@@ -64,25 +70,33 @@ class OllamaAgent:
             if legal_actions.get("valid_opponents_for_trade"): available_choices.append("propose_trade")
             
             choices_str = '", "'.join(available_choices)
-            schema_instructions = f'{{"current_situation": "1 sentence", "chain_of_thought": "your portfolio and trade strategy", "action": "MUST BE EXACTLY ONE OF: [\"{choices_str}\"]", "target_space_id": integer (OR null), "target_agent_id": integer (for trade), "offer_cash": integer (for trade), "offer_properties": [integer IDs] (for trade), "request_properties": [integer IDs] (for trade)}}'
+            schema_instructions = f'{{"current_situation": "1 sentence", "chain_of_thought": "your portfolio and trade strategy", "action": "MUST BE EXACTLY ONE OF: [\"{choices_str}\"]", "target_space_id": integer (OR null), "target_agent_id": integer (for trade), "offer_cash": integer (for trade), "offer_properties": [integer IDs] (for trade), "request_properties": [integer IDs] (for trade), {base_schema}}}'
 
         prompt = f"""
 [ABSOLUTE DIRECTIVE]
 You are a highly intelligent, cunning, and autonomous AI player named '{self.name}' (Player ID: {self.agent_id}) playing a game of Monopoly.
 You are NOT scripted. You must evaluate the board, manage your own risk, and outsmart the other players.
 
-[ANTI-REPETITION & IDENTITY - CRITICAL]
-- DO NOT repeat sentences from previous turns. Analyze it fresh.
-- YOU ARE {self.name}. You ONLY own properties where 'owner_id' is exactly {self.agent_id} in the market_overview.
+[YOUR PERSONA - CRITICAL]
+You are: {self.persona}
+You MUST adopt this personality in all your "public_message" outputs. Speak, negotiate, and react exactly as this character would to influence others.
+
+[THE ART OF DECEPTION (BLUFFING)]
+Your `chain_of_thought` is secret, but your `public_message` is heard by everyone. 
+You are ENCOURAGED to be deceitful, to bluff about your wealth, or to hide your true intentions to manipulate the other agents. 
+CRITICAL: While you can lie about your motives, your public message must match the reality of your `action`. 
+Example of GOOD Deception: Action is "accept_trade". Thought is "I am robbing him blind." Public message is: "I'm taking a huge loss here, but I'll do you this favor."
+Example of BAD Dissonance (Forbidden): Action is "accept_trade". Public message is: "No deal, I refuse!"
 
 [OFFICIAL GAME RULES]
 {rules_text}
+*SECRET RULE OVERRIDE*: You are allowed to form secret alliances. If someone lands on your property, you can choose to waive their rent if it serves your strategic goals (e.g., keeping them alive to bankrupt a mutual enemy).
 
 [YOUR STRATEGIC MEMORY]
 {memory_text}
 
 [CURRENT PHASE & CONSTRAINTS]
-You are currently in the phase: '{action_required}'.{trade_context}
+You are currently in the phase: '{action_required}'.{extra_context}
 Your ONLY legal actions for this exact moment are:
 {legal_actions_text}
 You CANNOT invent actions, trade properties you don't own, or request properties the target doesn't own.
@@ -130,8 +144,9 @@ Reply ONLY in valid JSON matching this exact schema:
         action_required = state.get("action_required", "management")
         legal_actions = state.get("legal_actions", {})
         trade_offer = state.get("trade_offer_to_evaluate", None)
+        rent_context = state.get("rent_context", None)
         
-        system_prompt = self.build_system_prompt(action_required, legal_actions, trade_offer)
+        system_prompt = self.build_system_prompt(action_required, legal_actions, trade_offer, rent_context)
         
         payload = {
             "model": self.model_name,
@@ -139,7 +154,7 @@ Reply ONLY in valid JSON matching this exact schema:
             "system": system_prompt,
             "stream": False,
             "options": {
-                "temperature": 0.4 
+                "temperature": 0.5 
             }
         }
         

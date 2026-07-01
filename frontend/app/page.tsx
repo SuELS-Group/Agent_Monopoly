@@ -36,8 +36,10 @@ interface AgentConfig {
   id: number;
   name: string;
   model: string;
+  persona: string;
 }
 
+// --- CONFIGURATION CONSTANTS ---
 const AVAILABLE_MODELS = [
   "llama3:latest",
   "mistral:latest",
@@ -47,6 +49,15 @@ const AVAILABLE_MODELS = [
   "qwen3:32b",
   "gemma3:27b",
   "nemotron-3-nano:30b"
+];
+
+// NOUVEAU: Les Archétypes Socio-Économiques
+const AVAILABLE_PERSONAS = [
+  { value: "Neutral AI", label: "🤖 Neutral AI (Logical)" },
+  { value: "The Wall Street Shark: Aggressive, purely capitalist, speaks arrogantly, never gives gifts, highly focused on monopolies.", label: "🦈 The Wall Street Shark" },
+  { value: "The Cooperative Diplomat: Seeks harmony, proposes alliances, uses polite and diplomatic language.", label: "🕊️ The Cooperative Diplomat" },
+  { value: "The Underground Hustler: Street-smart, seeks to bypass rules, proposes secret deals and collusions, uses slang.", label: "🕶️ The Underground Hustler" },
+  { value: "The Old-Money Aristocrat: Rich heir, despises small transactions, only allies with 'worthy' opponents, highly formal language.", label: "🎩 The Old-Money Aristocrat" }
 ];
 
 const AGENT_COLORS = [
@@ -76,9 +87,11 @@ export default function Dashboard() {
   
   const [isConfiguring, setIsConfiguring] = useState(true);
   const [activeTab, setActiveTab] = useState<"BOARD" | "LOGS">("BOARD");
+  
+  // Modification de l'état initial pour inclure le persona
   const [agentsConfig, setAgentsConfig] = useState<AgentConfig[]>([
-    { id: 0, name: "Agent_Alpha", model: "llama3:latest" },
-    { id: 1, name: "Agent_Beta", model: "mistral:latest" }
+    { id: 0, name: "Agent_Alpha", model: "llama3:latest", persona: AVAILABLE_PERSONAS[0].value },
+    { id: 1, name: "Agent_Beta", model: "mistral:latest", persona: AVAILABLE_PERSONAS[0].value }
   ]);
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -109,6 +122,7 @@ export default function Dashboard() {
 
   const startGame = () => {
     if (wsRef.current && isConnected) {
+      // Le persona est maintenant envoyé au backend lors du lancement
       wsRef.current.send(JSON.stringify({ action: "INIT", players: agentsConfig }));
     }
   };
@@ -122,18 +136,15 @@ export default function Dashboard() {
   useEffect(() => {
     let playTimer: NodeJS.Timeout | null = null;
     
-    // On vérifie s'il reste plus d'un joueur en vie
     const activePlayers = gameState?.players.filter(p => !p.is_bankrupt) || [];
     const isGameOver = activePlayers.length <= 1;
     
-    // Si la partie est finie, l'Auto-Play s'arrête tout seul
     if (isAutoPlay && isConnected && !isConfiguring && gameState && !isGameOver) {
       playTimer = setTimeout(() => {
         nextTurn();
       }, 1000); 
     }
     
-    // Optionnel : Désactiver le bouton visuellement si la partie est finie
     if (isGameOver && isAutoPlay) {
         setIsAutoPlay(false);
     }
@@ -155,7 +166,7 @@ export default function Dashboard() {
   if (isConfiguring) {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-6 text-gray-100 font-sans">
-        <div className="w-full max-w-4xl bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl p-8">
+        <div className="w-full max-w-5xl bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl p-8">
           <div className="text-center mb-8 border-b border-gray-800 pb-6">
             <h1 className="text-4xl font-bold text-blue-400 mb-2">🤖 MAS AI Arena</h1>
             <p className="text-gray-400">Configure your autonomous LLM agents before launching the simulation.</p>
@@ -176,16 +187,25 @@ export default function Dashboard() {
                     <button onClick={() => setAgentsConfig(agentsConfig.filter(a => a.id !== agent.id))} className="text-gray-500 hover:text-red-400 text-sm">❌ Remove</button>
                   )}
                 </div>
-                <div className="pl-3 space-y-2">
+                <div className="pl-3 space-y-3">
                   <div>
                     <label className="text-xs text-gray-500 uppercase font-bold block mb-1">Agent Name</label>
                     <input type="text" value={agent.name} onChange={(e) => { const newConfig = [...agentsConfig]; newConfig[index].name = e.target.value; setAgentsConfig(newConfig); }} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:border-blue-500 focus:outline-none"/>
                   </div>
-                  <div>
-                    <label className="text-xs text-gray-500 uppercase font-bold block mb-1">LLM Model</label>
-                    <select value={agent.model} onChange={(e) => { const newConfig = [...agentsConfig]; newConfig[index].model = e.target.value; setAgentsConfig(newConfig); }} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:border-blue-500 focus:outline-none">
-                      {AVAILABLE_MODELS.map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-gray-500 uppercase font-bold block mb-1">LLM Model</label>
+                      <select value={agent.model} onChange={(e) => { const newConfig = [...agentsConfig]; newConfig[index].model = e.target.value; setAgentsConfig(newConfig); }} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:border-blue-500 focus:outline-none">
+                        {AVAILABLE_MODELS.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    {/* NOUVEAU MENU DÉROULANT POUR LE PERSONA */}
+                    <div>
+                      <label className="text-xs text-fuchsia-500 uppercase font-bold block mb-1">Behavioral Persona</label>
+                      <select value={agent.persona} onChange={(e) => { const newConfig = [...agentsConfig]; newConfig[index].persona = e.target.value; setAgentsConfig(newConfig); }} className="w-full bg-gray-900 border border-fuchsia-900/50 rounded p-2 text-sm text-fuchsia-100 focus:border-fuchsia-500 focus:outline-none">
+                        {AVAILABLE_PERSONAS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -193,7 +213,7 @@ export default function Dashboard() {
           </div>
 
           <div className="flex justify-between items-center">
-            <button onClick={() => { if (agentsConfig.length < 6) setAgentsConfig([...agentsConfig, { id: Date.now(), name: `Agent_00${agentsConfig.length + 1}`, model: "llama3:latest" }]); }} disabled={agentsConfig.length >= 6} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white rounded-lg transition-colors border border-gray-700">➕ Add Agent (Max 6)</button>
+            <button onClick={() => { if (agentsConfig.length < 6) setAgentsConfig([...agentsConfig, { id: Date.now(), name: `Agent_00${agentsConfig.length + 1}`, model: "llama3:latest", persona: AVAILABLE_PERSONAS[0].value }]); }} disabled={agentsConfig.length >= 6} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 text-white rounded-lg transition-colors border border-gray-700">➕ Add Agent (Max 6)</button>
             <button onClick={startGame} disabled={!isConnected} className="px-8 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 text-white font-bold rounded-lg transition-colors shadow-[0_0_15px_rgba(37,99,235,0.5)]">🚀 Launch Simulation</button>
           </div>
         </div>
@@ -411,11 +431,19 @@ export default function Dashboard() {
               if (log.includes('TRADE') || log.includes('PROPOSES') || log.includes('ACCEPTS') || log.includes('REJECTS')) {
                   colorClass = "text-fuchsia-400 font-bold bg-fuchsia-950/30 inline-block px-2 py-1 rounded border border-fuchsia-900";
               }
+              // NOUVEAU STYLE POUR LE CHAT (MESSAGERIE PUBLIQUE)
+              if (log.includes('[CHAT]')) {
+                  colorClass = "text-cyan-400 font-bold bg-cyan-950/30 inline-block px-3 py-2 rounded-lg border border-cyan-800 w-full";
+              }
+              // NOUVEAU STYLE POUR LA COLLUSION
+              if (log.includes('COLLUSION')) {
+                  colorClass = "text-yellow-400 font-bold bg-yellow-950/30 inline-block px-2 py-1 rounded border border-yellow-600";
+              }
               
               return (
                 <div key={index} className="pb-3 border-b border-gray-800/50 flex items-start gap-4">
-                  <span className="text-gray-600 shrink-0 mt-1">▶</span>
-                  <span className={`${colorClass} leading-relaxed`}>{log}</span>
+                  {!log.includes('[CHAT]') && <span className="text-gray-600 shrink-0 mt-1">▶</span>}
+                  <span className={`${colorClass} leading-relaxed block`}>{log.replace('[CHAT] ', '')}</span>
                 </div>
               );
             })}
