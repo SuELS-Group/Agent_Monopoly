@@ -9,6 +9,7 @@ This repository contains a highly realistic, zero-sum Multi-Agent System (MAS) s
 *Figure 1: Real-time board state, dynamic monopoly visualization, and wealth tracking.*
 
 ![Cognitive Microscope Logs](docs/logs.png)
+
 *Figure 2: The Microscope view isolating internal AI Chain of Thought, public messaging, and physical actions.*
 
 ![Post-Match Behavioral Analytics](docs/analytics.png)
