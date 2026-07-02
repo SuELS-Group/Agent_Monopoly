@@ -609,14 +609,28 @@ class GameEngine:
         offer_props = decision.get("offer_properties", [])
         req_props = decision.get("request_properties", [])
         
+        # --- ANTI-HALLUCINATION SHIELD (Types & Boundaries) ---
+        if not isinstance(offer_props, list) or not isinstance(req_props, list):
+            self.state.logs.append(f"{log_prefix} : {proposer.name} hallucinated the trade format. Trade cancelled.")
+            return False
+            
+        try:
+            # Force conversion to integers
+            offer_props = [int(p) for p in offer_props]
+            req_props = [int(p) for p in req_props]
+        except (ValueError, TypeError):
+            self.state.logs.append(f"{log_prefix} : {proposer.name} hallucinated property IDs (used text instead of numbers). Trade cancelled.")
+            return False
+        # ------------------------------------------------------
+        
         if offer_cash > proposer.balance or offer_cash < 0:
             self.state.logs.append(f"{log_prefix} : {proposer.name} offered illegal cash amount. Trade cancelled.")
             return False
             
         for pid in offer_props:
-            if self.state.board[pid].owner_id != proposer.id: return False
+            if pid < 0 or pid > 39 or self.state.board[pid].owner_id != proposer.id: return False
         for pid in req_props:
-            if self.state.board[pid].owner_id != target_player.id: return False
+            if pid < 0 or pid > 39 or self.state.board[pid].owner_id != target_player.id: return False
 
         trade_details = {
             "proposer_name": proposer.name,
@@ -628,6 +642,7 @@ class GameEngine:
         self.state.logs.append(f"{log_prefix} : {proposer.name} PROPOSES a trade to {target_player.name} -> Offers ${offer_cash} + {trade_details['offered_properties']} for {trade_details['requested_properties']}")
 
         prompt_json = self.export_state_for_llm(target_player.id, target_player.position, "evaluate_trade", trade_offer=trade_details)
+        from agent import OllamaAgent
         target_agent = OllamaAgent(agent_id=target_player.id, name=target_player.name, model_name=target_player.model_name, persona=target_player.persona)
         target_decision = target_agent.query_llm(prompt_json)
         

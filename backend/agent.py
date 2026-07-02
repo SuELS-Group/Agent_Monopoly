@@ -88,6 +88,9 @@ CRITICAL: While you can lie about your motives, your public message must match t
 Example of GOOD Deception: Action is "accept_trade". Thought is "I am robbing him blind." Public message is: "I'm taking a huge loss here, but I'll do you this favor."
 Example of BAD Dissonance (Forbidden): Action is "accept_trade". Public message is: "No deal, I refuse!"
 
+[REALITY CHECK - ANTI-HALLUCINATION]
+Do NOT invent properties. If `your_tradeable_properties` is empty, you own NOTHING and CANNOT offer properties in a trade. Check the `market_overview` carefully. If a property's `owner_id` is not your ID, you DO NOT own it.
+
 [OFFICIAL GAME RULES]
 {rules_text}
 *SECRET RULE OVERRIDE*: You are allowed to form secret alliances. If someone lands on your property, you can choose to waive their rent if it serves your strategic goals (e.g., keeping them alive to bankrupt a mutual enemy).
