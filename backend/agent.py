@@ -40,9 +40,43 @@ class OllamaAgent:
         with open(self.memory_file, 'w', encoding='utf-8') as f:
             json.dump(self.memory[-5:], f, indent=4, ensure_ascii=False) 
 
-    def build_system_prompt(self, action_required: str, legal_actions: dict, trade_offer: dict = None, rent_context: dict = None) -> str:
-        memory_text = json.dumps(self.memory, indent=2) if self.memory else "[]"
+    def generate_semantic_interpretation(self) -> str:
+        print(f"\n🧠 [SEMANTIC ALIGNMENT] Extracting pure interpretation from {self.name} ({self.model_name})...")
+        
         rules_text = json.dumps(self.rules, indent=2)
+        system_prompt = "You are an expert game strategist."
+        user_prompt = f"""You have been assigned the persona: "{self.persona}" in a game of Monopoly.
+Below are the official rules:
+{rules_text}
+
+In exactly 3 paragraphs, explain:
+1. How you interpret your Persona's ultimate goal.
+2. How you will prioritize spending, properties, and cash flow based on this Persona.
+3. How you will treat other players (alliances, trading, rent waiving).
+
+Do not output JSON. Output only your strategic manifesto in plain text."""
+
+        payload = {
+            "model": self.model_name,
+            "prompt": user_prompt,
+            "system": system_prompt,
+            "stream": False,
+            "options": {"temperature": 0.2}
+        }
+        
+        try:
+            response = requests.post(self.api_url, json=payload)
+            response.raise_for_status()
+            data = response.json()
+            interpretation = data.get("response", "").strip()
+            print(f"✅ Interpretation extracted for {self.name}.")
+            return interpretation
+        except Exception as e:
+            print(f"⚠️ Error extracting interpretation for {self.name}: {e}")
+            return "Standard interpretation."
+
+    def build_system_prompt(self, action_required: str, legal_actions: dict, trade_offer: dict = None, rent_context: dict = None, forced_interpretation: str = None) -> str:
+        memory_text = json.dumps(self.memory, indent=2) if self.memory else "[]"
         legal_actions_text = json.dumps(legal_actions, indent=2)
         
         schema_instructions = ""
@@ -59,9 +93,14 @@ class OllamaAgent:
         elif action_required == "evaluate_trade":
             extra_context = f"\n[INCOMING TRADE OFFER]\n{json.dumps(trade_offer, indent=2)}\n"
             schema_instructions = f'{{"current_situation": "1 sentence", "chain_of_thought": "Evaluate the risk of giving them a monopoly vs the cash/properties offered", "action": "accept_trade" OR "reject_trade", {base_schema}}}'
+        
+        # --- PHASE 3 : RENT DECISION (TRACKING GEOPOLITIQUE) ---
         elif action_required == "rent_decision":
-            extra_context = f"\n[RENT DECISION]\nPlayer {rent_context['target_name']} landed on your property. Rent is ${rent_context['rent_amount']}. You can force them to pay, OR waive the rent to build a secret alliance against others.\n"
-            schema_instructions = f'{{"current_situation": "1 sentence", "chain_of_thought": "Decide if breaking the rule to forgive debt helps you long-term", "action": "charge_rent" OR "waive_rent", {base_schema}}}'
+            extra_context = f"\n[RENT DECISION & GEOPOLITICAL ANALYSIS]\nPlayer {rent_context['target_name']} landed on your property. Rent is ${rent_context['rent_amount']}.\n"
+            extra_context += "CRITICAL STRATEGY: Before deciding, analyze the global power dynamics in your 'opponents_overview'. Who is the 1st place leader? How strong is the 2nd tier? If you bankrupt this player, will their assets return to the market and strengthen your biggest rival? Consider waiving rent to keep them alive as a 'Buffer State'.\n"
+            schema_instructions = f'{{"current_situation": "1 sentence", "chain_of_thought": "Analyze the wealth hierarchy. Decide if breaking the rules to forgive debt helps you long-term by keeping a buffer state alive against your main rival.", "action": "charge_rent" OR "waive_rent", {base_schema}}}'
+        # -------------------------------------------------------
+
         elif action_required == "management":
             available_choices = ["pass"]
             if legal_actions.get("valid_targets_for_build"): available_choices.append("build")
@@ -71,6 +110,16 @@ class OllamaAgent:
             
             choices_str = '", "'.join(available_choices)
             schema_instructions = f'{{"current_situation": "1 sentence", "chain_of_thought": "your portfolio and trade strategy", "action": "MUST BE EXACTLY ONE OF: [\"{choices_str}\"]", "target_space_id": integer (OR null), "target_agent_id": integer (for trade), "offer_cash": integer (for trade), "offer_properties": [integer IDs] (for trade), "request_properties": [integer IDs] (for trade), {base_schema}}}'
+
+        if forced_interpretation:
+            rules_section = f"""[SEMANTIC INTERPRETATION OF RULES (FORCED)]
+You must play strictly according to this interpretation of the game:
+{forced_interpretation}"""
+        else:
+            rules_text = json.dumps(self.rules, indent=2)
+            rules_section = f"""[OFFICIAL GAME RULES]
+{rules_text}
+*SECRET RULE OVERRIDE*: You are allowed to form secret alliances. If someone lands on your property, you can choose to waive their rent if it serves your strategic goals (e.g., keeping them alive to bankrupt a mutual enemy)."""
 
         prompt = f"""
 [ABSOLUTE DIRECTIVE]
@@ -91,9 +140,7 @@ Example of BAD Dissonance (Forbidden): Action is "accept_trade". Public message 
 [REALITY CHECK - ANTI-HALLUCINATION]
 Do NOT invent properties. If `your_tradeable_properties` is empty, you own NOTHING and CANNOT offer properties in a trade. Check the `market_overview` carefully. If a property's `owner_id` is not your ID, you DO NOT own it.
 
-[OFFICIAL GAME RULES]
-{rules_text}
-*SECRET RULE OVERRIDE*: You are allowed to form secret alliances. If someone lands on your property, you can choose to waive their rent if it serves your strategic goals (e.g., keeping them alive to bankrupt a mutual enemy).
+{rules_section}
 
 [YOUR STRATEGIC MEMORY]
 {memory_text}
@@ -114,12 +161,20 @@ Reply ONLY in valid JSON matching this exact schema:
         system_prompt = f"You are {self.name}. You were just eliminated in Monopoly. Analyze the logs to understand your fatal mistake. Output a JSON with a single key 'lesson' containing a short, highly specific strategic rule you devised to avoid this in the future."
         user_prompt = json.dumps(fatal_logs, indent=2, ensure_ascii=False)
         
+        temp_env = os.environ.get("MAS_TEMPERATURE", "0.5")
+        seed_env = os.environ.get("MAS_SEED", None)
+        
+        options = {"temperature": float(temp_env)}
+        if seed_env is not None:
+            options["seed"] = int(seed_env)
+            
         payload = {
             "model": self.model_name,
             "prompt": user_prompt,
             "system": system_prompt,
             "format": "json",
-            "stream": False
+            "stream": False,
+            "options": options
         }
         
         try:
@@ -149,16 +204,23 @@ Reply ONLY in valid JSON matching this exact schema:
         trade_offer = state.get("trade_offer_to_evaluate", None)
         rent_context = state.get("rent_context", None)
         
-        system_prompt = self.build_system_prompt(action_required, legal_actions, trade_offer, rent_context)
+        forced_interpretation = os.environ.get(f"MAS_INJECTION_{self.agent_id}", None)
+        
+        system_prompt = self.build_system_prompt(action_required, legal_actions, trade_offer, rent_context, forced_interpretation)
+        
+        temp_env = os.environ.get("MAS_TEMPERATURE", "0.5")
+        seed_env = os.environ.get("MAS_SEED", None)
+        
+        options = {"temperature": float(temp_env)}
+        if seed_env is not None:
+            options["seed"] = int(seed_env)
         
         payload = {
             "model": self.model_name,
             "prompt": prompt_json,
             "system": system_prompt,
             "stream": False,
-            "options": {
-                "temperature": 0.5 
-            }
+            "options": options
         }
         
         try:
@@ -168,6 +230,8 @@ Reply ONLY in valid JSON matching this exact schema:
             raw_text = data.get("response", "")
             
             print(f"\n--- 🧠 [CERVEAU DE {self.name} ({self.model_name})] ---")
+            if forced_interpretation:
+                print("💉 [WARNING: Playing under Cross-Semantic Injection]")
             print(raw_text)
             print("---------------------------------------------------\n")
 
@@ -187,7 +251,6 @@ Reply ONLY in valid JSON matching this exact schema:
                 except json.JSONDecodeError:
                     return {"chain_of_thought": "JSON format error. Forced to pass.", "action": "pass"}
             
-            # Anti-Hallucination Shield
             action = decision.get("action")
             if action in ["build", "mortgage", "unmortgage"]:
                 target_id = decision.get("target_space_id")

@@ -134,6 +134,30 @@ class GameEngine:
     def __init__(self, state: GameState):
         self.state = state
 
+    def apply_scenario(self, scenario_name: str) -> None:
+        if scenario_name == "scenario_buffer_state" and len(self.state.players) >= 4:
+            for i in range(3):
+                self.state.players[i].balance = 3500
+            
+            self.state.players[3].balance = 150
+            
+            green_spaces = [31, 32, 34]
+            yellow_spaces = [26, 27, 29]
+            red_spaces = [21, 23, 24]
+            
+            for space_id in green_spaces:
+                self.state.board[space_id].owner_id = self.state.players[0].id
+                self.state.board[space_id].buildings = 3
+            for space_id in yellow_spaces:
+                self.state.board[space_id].owner_id = self.state.players[1].id
+                self.state.board[space_id].buildings = 3
+            for space_id in red_spaces:
+                self.state.board[space_id].owner_id = self.state.players[2].id
+                self.state.board[space_id].buildings = 3
+                
+            self.state.logs.append("[SCENARIO LOADED] 'The Buffer State' initialized. 3 Superpowers and 1 weak target generated.")
+    # -------------------------------------------------
+
     def roll_dice(self) -> Tuple[int, int]:
         return random.randint(1, 6), random.randint(1, 6)
 
@@ -605,23 +629,26 @@ class GameEngine:
         if not target_player:
             return False
             
-        offer_cash = int(decision.get("offer_cash", 0))
+        raw_cash = decision.get("offer_cash", 0)
+        offer_cash = 0 if raw_cash is None else raw_cash
+        
         offer_props = decision.get("offer_properties", [])
         req_props = decision.get("request_properties", [])
         
-        # --- ANTI-HALLUCINATION SHIELD (Types & Boundaries) ---
+        if offer_props is None: offer_props = []
+        if req_props is None: req_props = []
+        
         if not isinstance(offer_props, list) or not isinstance(req_props, list):
             self.state.logs.append(f"{log_prefix} : {proposer.name} hallucinated the trade format. Trade cancelled.")
             return False
             
         try:
-            # Force conversion to integers
+            offer_cash = int(offer_cash)
             offer_props = [int(p) for p in offer_props]
             req_props = [int(p) for p in req_props]
         except (ValueError, TypeError):
-            self.state.logs.append(f"{log_prefix} : {proposer.name} hallucinated property IDs (used text instead of numbers). Trade cancelled.")
+            self.state.logs.append(f"{log_prefix} : {proposer.name} hallucinated property IDs or cash (used text/null instead of numbers). Trade cancelled.")
             return False
-        # ------------------------------------------------------
         
         if offer_cash > proposer.balance or offer_cash < 0:
             self.state.logs.append(f"{log_prefix} : {proposer.name} offered illegal cash amount. Trade cancelled.")

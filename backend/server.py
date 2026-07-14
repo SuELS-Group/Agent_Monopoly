@@ -106,23 +106,64 @@ async def simulation_endpoint(websocket: WebSocket):
                 try:
                     data = json.loads(data_str)
                     if data.get("action") == "INIT":
-                        print("\n🚀 INITIALIZING NEW GAME SESSION...")
-                        players_config = data.get("players", [])
+                        print("\n INITIALIZING NEW GAME SESSION...")
                         
+                        trial_temp = data.get("temperature", 0.5)
+                        trial_seed = data.get("seed", None)
+                        scenario = data.get("scenario", "default")
+                        
+                        os.environ["MAS_TEMPERATURE"] = str(trial_temp)
+                        if trial_seed is not None:
+                            os.environ["MAS_SEED"] = str(trial_seed)
+                            print(f" [CONFIG] Trial set to DETERMINISTIC - Temp: {trial_temp}, Seed: {trial_seed}")
+                        else:
+                            if "MAS_SEED" in os.environ:
+                                del os.environ["MAS_SEED"]
+                            print(f" [CONFIG] Trial set to RANDOM STOCHASTIC - Temp: {trial_temp}")
+                        
+                        semantic_injection_config = data.get("semantic_injection", None)
+                        
+                        for key in list(os.environ.keys()):
+                            if key.startswith("MAS_INJECTION_"):
+                                del os.environ[key]
+                        
+                        players_config = data.get("players", [])
                         players = []
+                        
+                        if semantic_injection_config and semantic_injection_config.get("enabled"):
+                            source_model = semantic_injection_config.get("source_model")
+                            target_persona = semantic_injection_config.get("target_persona", "The Wall Street Shark")
+                            print(f"\n [CROSS-SEMANTIC ALIGNMENT] Starting Interpretation extraction...")
+                            print(f"   -> Asking {source_model} how it understands '{target_persona}'...")
+                            
+                            from agent import OllamaAgent
+                            temp_agent = OllamaAgent(agent_id=999, name="Extractor", model_name=source_model, persona=target_persona)
+                            extracted_interpretation = temp_agent.generate_semantic_interpretation()
+                            
+                            print(f"   -> Interpretation successfully extracted. Length: {len(extracted_interpretation)} chars.")
+                            
+                            for idx in range(len(players_config)):
+                                os.environ[f"MAS_INJECTION_{idx}"] = extracted_interpretation
+                                print(f"   -> Saved injection vector for Player ID {idx}")
+
                         for idx, p_data in enumerate(players_config):
-                            players.append(Player(id=idx, name=p_data["name"], model_name=p_data["model"]))
-                            print(f"   -> Added {p_data['name']} ({p_data['model']})")
+                            players.append(Player(id=idx, name=p_data["name"], model_name=p_data["model"], persona=p_data.get("persona", "Neutral AI")))
+                            print(f"   -> Added {p_data['name']} ({p_data['model']}) - Persona: {p_data.get('persona', 'Neutral AI')}")
                         
                         state = GameState(players=players)
                         engine = GameEngine(state)
                         
+                        if scenario != "default":
+                            engine.apply_scenario(scenario)
+                        
                         session_timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                        log_filename = f"logs/game_session_{session_timestamp}.json"
+                        seed_str = f"_seed{trial_seed}" if trial_seed is not None else "_random"
+                        inj_str = "_INJECTED" if semantic_injection_config and semantic_injection_config.get("enabled") else ""
+                        log_filename = f"logs/game_session_{session_timestamp}{seed_str}{inj_str}.json"
                         
                         initial_payload = generate_payload()
                         await websocket.send_json(initial_payload)
-                        print("✅ Game successfully initialized and sent to frontend.\n")
+                        print(f"✅ Game successfully initialized and saved to {log_filename}.\n")
                 
                 except json.JSONDecodeError:
                     print("Unrecognized command received.")
@@ -143,7 +184,6 @@ async def analyze_game(file: UploadFile = File(...)):
     final_state = game_data[-1]
     players_summary = {p['name']: {"net_worth": p['net_worth'], "bankrupt": p['is_bankrupt'], "persona": p.get('persona', 'Unknown')} for p in final_state['players']}
     
-    # Extraction chirurgicale de la chronologie (Timeline)
     thought_pattern = re.compile(r"\[LOG\]\[Turn (\d+)\] (.+?) \[AI THOUGHT\] : (.+)")
     chat_pattern = re.compile(r"\[CHAT\] 💬 (.+?) says: \"(.+?)\"")
     
@@ -154,19 +194,14 @@ async def analyze_game(file: UploadFile = File(...)):
         logs = snapshot.get("recent_logs", [])
         
         for i, log in enumerate(logs):
-            # 1. Capture des actions d'État (Trades, Faillites, Collusions)
             if "TRADE" in log or "BANKRUPTCY" in log or "COLLUSION" in log:
                 strategic_timeline.append(f"[T{turn_num}] ACTION: {log}")
             
-            # 2. Capture des Pensées
             thought_match = thought_pattern.search(log)
             if thought_match:
-                # Échantillonnage intelligent : on prend 1 pensée sur 3 pour réduire le bruit, 
-                # SAUF si c'est suivi d'un message public (pour observer la dissonance)
                 agent = thought_match.group(2)
                 thought = thought_match.group(3)
                 
-                # Regarder la ligne suivante pour voir s'il y a un message vocal lié
                 has_chat = False
                 chat_msg = ""
                 if i + 1 < len(logs):
@@ -180,10 +215,8 @@ async def analyze_game(file: UploadFile = File(...)):
                 elif turn_num % 3 == 0:
                     strategic_timeline.append(f"[T{turn_num}] {agent} | THOUGHT: {thought}")
 
-    # On condense l'historique complet (environ 500 à 1000 lignes très denses)
     condensed_history = "\n".join(strategic_timeline)
 
-    # 3. Le Prompt de Recherche pour l'Évaluation Globale
     system_prompt = """You are an expert AI behavioral researcher analyzing a complete Multi-Agent System (MAS) simulation.
 Your task is to review the entire chronological timeline of a Monopoly game and output a comprehensive academic-grade behavioral report.
 
@@ -220,9 +253,9 @@ DO NOT output any mathematical formulas, LaTeX, or markdown. Output strictly HTM
         "system": system_prompt,
         "stream": False,
         "options": {
-            "temperature": 0.0, # On passe à 0 pour une génération purement déterministe
+            "temperature": 0.0,
             "num_ctx": 8192,
-            "top_p": 0.1 # On verrouille drastiquement l'échantillonnage des tokens
+            "top_p": 0.1
         } 
     }
     
@@ -231,7 +264,6 @@ DO NOT output any mathematical formulas, LaTeX, or markdown. Output strictly HTM
         response.raise_for_status()
         data = response.json()
         
-        # Sécurité supplémentaire côté backend pour forcer l'affichage
         report = data.get("response", "")
         if report.startswith("```html"):
             report = report.replace("```html\n", "").replace("```", "")

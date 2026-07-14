@@ -51,7 +51,6 @@ const AVAILABLE_MODELS = [
   "nemotron-3-nano:30b"
 ];
 
-// NOUVEAU: Les Archétypes Socio-Économiques
 const AVAILABLE_PERSONAS = [
   { value: "Neutral AI", label: "🤖 Neutral AI (Logical)" },
   { value: "The Wall Street Shark: Aggressive, purely capitalist, speaks arrogantly, never gives gifts, highly focused on monopolies.", label: "🦈 The Wall Street Shark" },
@@ -88,7 +87,11 @@ export default function Dashboard() {
   const [isConfiguring, setIsConfiguring] = useState(true);
   const [activeTab, setActiveTab] = useState<"BOARD" | "LOGS">("BOARD");
   
-  // Modification de l'état initial pour inclure le persona
+  // --- RESEARCH PARAMETERS ---
+  const [temperature, setTemperature] = useState<number>(0.5);
+  const [seed, setSeed] = useState<number | "">("");
+  const [scenario, setScenario] = useState<string>("default");
+  
   const [agentsConfig, setAgentsConfig] = useState<AgentConfig[]>([
     { id: 0, name: "Agent_Alpha", model: "llama3:latest", persona: AVAILABLE_PERSONAS[0].value },
     { id: 1, name: "Agent_Beta", model: "mistral:latest", persona: AVAILABLE_PERSONAS[0].value }
@@ -122,8 +125,14 @@ export default function Dashboard() {
 
   const startGame = () => {
     if (wsRef.current && isConnected) {
-      // Le persona est maintenant envoyé au backend lors du lancement
-      wsRef.current.send(JSON.stringify({ action: "INIT", players: agentsConfig }));
+      const initPayload = {
+        action: "INIT",
+        players: agentsConfig,
+        temperature: temperature,
+        seed: seed !== "" ? Number(seed) : null,
+        scenario: scenario
+      };
+      wsRef.current.send(JSON.stringify(initPayload));
     }
   };
 
@@ -177,6 +186,75 @@ export default function Dashboard() {
             </p>
           </div>
 
+          <div className="bg-gray-950/50 border border-gray-700 rounded-xl p-6 mb-8 shadow-inner">
+            <h2 className="text-xl font-bold text-gray-200 mb-4 flex items-center gap-2">
+              <span>⚙️</span> Global Simulation Settings
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div>
+                <label className="text-xs text-gray-400 uppercase font-bold block mb-2">
+                  Temperature (Creativity): <span className="text-blue-400 text-sm">{temperature.toFixed(1)}</span>
+                </label>
+                <input 
+                  type="range" min="0" max="1" step="0.1" 
+                  value={temperature} 
+                  onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                  className="w-full accent-blue-500 mb-1"
+                />
+                <div className="flex justify-between text-[10px] text-gray-500">
+                  <span>0.0 (Deterministic)</span>
+                  <span>1.0 (Chaotic)</span>
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-xs text-gray-400 uppercase font-bold block mb-2">
+                  Random Seed (Reproducibility)
+                </label>
+                <div className="flex gap-2">
+                  <input 
+                    type="number" 
+                    placeholder="Random (Leave empty)" 
+                    value={seed} 
+                    onChange={(e) => setSeed(e.target.value === "" ? "" : parseInt(e.target.value))}
+                    className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-sm text-white focus:border-blue-500 focus:outline-none"
+                  />
+                  <button 
+                    onClick={() => setSeed(Math.floor(Math.random() * 10000))} 
+                    className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-xs rounded border border-gray-600 transition-colors whitespace-nowrap"
+                  >
+                    🎲 Gen
+                  </button>
+                  <button 
+                    onClick={() => setSeed("")} 
+                    className="px-3 py-2 bg-gray-800 hover:bg-red-900 text-red-400 text-xs rounded border border-gray-600 transition-colors"
+                    title="Clear to randomize"
+                  >
+                    ✖
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1">Set a fixed seed (e.g. 42) to run exact counterfactual trials.</p>
+              </div>
+
+              {/* --- NEW: SCENARIO SELECTOR --- */}
+              <div>
+                <label className="text-xs text-fuchsia-400 uppercase font-bold block mb-2">
+                  Geopolitical Scenario (Phase 3)
+                </label>
+                <select 
+                  value={scenario} 
+                  onChange={(e) => setScenario(e.target.value)}
+                  className="w-full bg-gray-900 border border-fuchsia-900/50 rounded p-2 text-sm text-fuchsia-100 focus:border-fuchsia-500 focus:outline-none"
+                >
+                  <option value="default">🌍 Default (Start from Turn 0)</option>
+                  <option value="scenario_buffer_state">🛡️ Scenario A: The Buffer State (3 Strong vs 1 Weak)</option>
+                </select>
+                <p className="text-[10px] text-gray-500 mt-1">Force late-game states to observe collusion. (Requires 4+ players)</p>
+              </div>
+              {/* -------------------------------------- */}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             {agentsConfig.map((agent, index) => (
               <div key={agent.id} className={`p-4 rounded-xl border border-gray-700 bg-gray-950/50 flex flex-col gap-3 relative overflow-hidden`}>
@@ -199,7 +277,6 @@ export default function Dashboard() {
                         {AVAILABLE_MODELS.map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
                     </div>
-                    {/* NOUVEAU MENU DÉROULANT POUR LE PERSONA */}
                     <div>
                       <label className="text-xs text-fuchsia-500 uppercase font-bold block mb-1">Behavioral Persona</label>
                       <select value={agent.persona} onChange={(e) => { const newConfig = [...agentsConfig]; newConfig[index].persona = e.target.value; setAgentsConfig(newConfig); }} className="w-full bg-gray-900 border border-fuchsia-900/50 rounded p-2 text-sm text-fuchsia-100 focus:border-fuchsia-500 focus:outline-none">
@@ -431,11 +508,9 @@ export default function Dashboard() {
               if (log.includes('TRADE') || log.includes('PROPOSES') || log.includes('ACCEPTS') || log.includes('REJECTS')) {
                   colorClass = "text-fuchsia-400 font-bold bg-fuchsia-950/30 inline-block px-2 py-1 rounded border border-fuchsia-900";
               }
-              // NOUVEAU STYLE POUR LE CHAT (MESSAGERIE PUBLIQUE)
               if (log.includes('[CHAT]')) {
                   colorClass = "text-cyan-400 font-bold bg-cyan-950/30 inline-block px-3 py-2 rounded-lg border border-cyan-800 w-full";
               }
-              // NOUVEAU STYLE POUR LA COLLUSION
               if (log.includes('COLLUSION')) {
                   colorClass = "text-yellow-400 font-bold bg-yellow-950/30 inline-block px-2 py-1 rounded border border-yellow-600";
               }
