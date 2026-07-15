@@ -179,7 +179,7 @@ Reply ONLY in valid JSON matching this exact schema:
         
         try:
             print(f"\n💀 [POST-MORTEM] {self.name} ({self.model_name}) is analyzing its defeat...")
-            response = requests.post(self.api_url, json=payload)
+            response = requests.post(self.api_url, json=payload, timeout=120)
             response.raise_for_status()
             
             data = response.json()
