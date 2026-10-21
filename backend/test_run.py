@@ -1,7 +1,7 @@
 from engine import GameState, Player, GameEngine
 
-player1 = Player(id=0, name="Agent_Alpha")
-player2 = Player(id=1, name="Agent_Beta")
+player1 = Player(id=0, name="Agent_Alpha", model_name="llama3:latest")
+player2 = Player(id=1, name="Agent_Beta", model_name="llama3:latest")
 
 state = GameState(players=[player1, player2])
 engine = GameEngine(state)

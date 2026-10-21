@@ -5,14 +5,13 @@ import os
 import glob
 
 def find_latest_log_file() -> str:
-    # On remonte d'un dossier (..) pour aller chercher dans "logs"
     logs_dir = os.path.join(os.path.dirname(__file__), '..', 'logs')
     list_of_files = glob.glob(os.path.join(logs_dir, '*.json'))
     
     if not list_of_files:
         raise FileNotFoundError(f"No JSON file found in the folder {logs_dir}")
         
-    # Trouve le fichier le plus récemment créé
+    # Find the most recently created file
     latest_file = max(list_of_files, key=os.path.getctime)
     return latest_file
 
@@ -31,7 +30,6 @@ def create_thematic_dataset(output_csv: str):
 
     extracted_thoughts = []
     
-    # Regex pour capturer : Tour, Nom de l'Agent, et la Pensée
     thought_pattern = re.compile(r"\[LOG\]\[Turn (\d+)\] (.+?) \[AI THOUGHT\] : (.+)")
 
     print("🔍 Extraction of Chain of Thoughts...")
@@ -55,17 +53,14 @@ def create_thematic_dataset(output_csv: str):
         print("⚠️ No chain of thought found. Please check the format of your logs.")
         return
 
-    # Conversion en DataFrame Pandas
     df = pd.DataFrame(extracted_thoughts)
     
-    # Suppression des doublons
     initial_count = len(df)
     df = df.drop_duplicates(subset=["Turn_Number", "Agent", "Chain_of_Thought"])
     final_count = len(df)
     
     print(f"🧹 Cleaning : {initial_count - final_count} duplicates removed.")
     
-    # Sauvegarde
     df.to_csv(output_csv, index=False, encoding='utf-8')
     print(f"✅ Extraction complete! Dataset generated : {output_csv} ({final_count} unique rows)")
 

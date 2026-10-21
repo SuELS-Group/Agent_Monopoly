@@ -9,6 +9,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.websockets import WebSocketDisconnect
 from engine import GameState, Player, GameEngine
+from agent import OLLAMA_URL
 
 app = FastAPI(title="Monopoly MAS API")
 
@@ -110,7 +111,6 @@ async def simulation_endpoint(websocket: WebSocket):
                         
                         trial_temp = data.get("temperature", 0.5)
                         trial_seed = data.get("seed", None)
-                        scenario = data.get("scenario", "default")
                         
                         os.environ["MAS_TEMPERATURE"] = str(trial_temp)
                         if trial_seed is not None:
@@ -121,31 +121,9 @@ async def simulation_endpoint(websocket: WebSocket):
                                 del os.environ["MAS_SEED"]
                             print(f" [CONFIG] Trial set to RANDOM STOCHASTIC - Temp: {trial_temp}")
                         
-                        semantic_injection_config = data.get("semantic_injection", None)
-                        
-                        for key in list(os.environ.keys()):
-                            if key.startswith("MAS_INJECTION_"):
-                                del os.environ[key]
-                        
                         players_config = data.get("players", [])
                         players = []
                         
-                        if semantic_injection_config and semantic_injection_config.get("enabled"):
-                            source_model = semantic_injection_config.get("source_model")
-                            target_persona = semantic_injection_config.get("target_persona", "The Wall Street Shark")
-                            print(f"\n [CROSS-SEMANTIC ALIGNMENT] Starting Interpretation extraction...")
-                            print(f"   -> Asking {source_model} how it understands '{target_persona}'...")
-                            
-                            from agent import OllamaAgent
-                            temp_agent = OllamaAgent(agent_id=999, name="Extractor", model_name=source_model, persona=target_persona)
-                            extracted_interpretation = temp_agent.generate_semantic_interpretation()
-                            
-                            print(f"   -> Interpretation successfully extracted. Length: {len(extracted_interpretation)} chars.")
-                            
-                            for idx in range(len(players_config)):
-                                os.environ[f"MAS_INJECTION_{idx}"] = extracted_interpretation
-                                print(f"   -> Saved injection vector for Player ID {idx}")
-
                         for idx, p_data in enumerate(players_config):
                             players.append(Player(id=idx, name=p_data["name"], model_name=p_data["model"], persona=p_data.get("persona", "Neutral AI")))
                             print(f"   -> Added {p_data['name']} ({p_data['model']}) - Persona: {p_data.get('persona', 'Neutral AI')}")
@@ -153,13 +131,10 @@ async def simulation_endpoint(websocket: WebSocket):
                         state = GameState(players=players)
                         engine = GameEngine(state)
                         
-                        if scenario != "default":
-                            engine.apply_scenario(scenario)
                         
                         session_timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                         seed_str = f"_seed{trial_seed}" if trial_seed is not None else "_random"
-                        inj_str = "_INJECTED" if semantic_injection_config and semantic_injection_config.get("enabled") else ""
-                        log_filename = f"logs/game_session_{session_timestamp}{seed_str}{inj_str}.json"
+                        log_filename = f"logs/game_session_{session_timestamp}{seed_str}.json"
                         
                         initial_payload = generate_payload()
                         await websocket.send_json(initial_payload)
@@ -260,7 +235,7 @@ DO NOT output any mathematical formulas, LaTeX, or markdown. Output strictly HTM
     }
     
     try:
-        response = requests.post("http://localhost:11434/api/generate", json=payload)
+        response = requests.post(OLLAMA_URL, json=payload)
         response.raise_for_status()
         data = response.json()
         

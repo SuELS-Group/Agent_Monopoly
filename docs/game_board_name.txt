@@ -1,0 +1,46 @@
+| ID | Color      | Old                  |  New                     |
+| -: | ---------- | --------------------- | ----------------------- |
+|  1 | Brown      | Mediterranean Avenue  | Ammerlander Heer Street |
+|  3 | Brown      | Baltic Avenue         | Lange Street            |
+|  6 | Light Blue | Oriental Avenue       | Bloherfeld Street       |
+|  8 | Light Blue | Vermont Avenue        | Artillery Street        |
+|  9 | Light Blue | Connecticut Avenue    | Uhlhorn Street          |
+| 11 | Pink       | St. Charles Place     | Ofen Street             |
+| 13 | Pink       | States Avenue         | Haarenesch Street       |
+| 14 | Pink       | Virginia Avenue       | Theater Wall Street     |
+| 16 | Orange     | St. James Place       | Nadorst Street          |
+| 18 | Orange     | Tennessee Avenue      | Kupkers Street          |
+| 19 | Orange     | New York Avenue       | Donnerschwee Street     |
+| 21 | Red        | Kentucky Avenue       | Bremen Street           |
+| 23 | Red        | Indiana Avenue        | Escher Street           |
+| 24 | Red        | Illinois Avenue       | Cloppenburg Street      |
+| 26 | Yellow     | Atlantic Avenue       | Hundsmuhle Street       |
+| 27 | Yellow     | Ventnor Avenue        | Haarenfeld Street       |
+| 29 | Yellow     | Marvin Gardens        | Edewecht Land Street    |
+| 31 | Green      | Pacific Avenue        | Philosopher Street      |
+| 32 | Green      | North Carolina Avenue | Stau Street             |
+| 34 | Green      | Pennsylvania Avenue   | Hunte Street            |
+| 37 | Dark Blue  | Park Place            | Dam Street              |
+| 39 | Dark Blue  | Boardwalk             | Alexander Street        |
+
+special
+| ID | Old                   | New                   |
+| -: | --------------------- | --------------------- |
+|  0 | Go                    | Go                    |
+|  2 | Community Chest       | Community Chest       |
+|  4 | Income Tax            | Income Tax            |
+|  5 | Reading Railroad      | Reading Railroad      |
+|  7 | Chance                | Chance                |
+| 10 | Jail / Just Visiting  | Jail / Just Visiting  |
+| 12 | Electric Company      | Electric Company      |
+| 15 | Pennsylvania Railroad | Pennsylvania Railroad |
+| 17 | Community Chest       | Community Chest       |
+| 20 | Free Parking          | Free Parking          |
+| 22 | Chance                | Chance                |
+| 25 | B. & O. Railroad      | B. & O. Railroad      |
+| 28 | Water Works           | Water Works           |
+| 30 | Go To Jail            | Go To Jail            |
+| 33 | Community Chest       | Community Chest       |
+| 35 | Short Line            | Short Line            |
+| 36 | Chance                | Chance                |
+| 38 | Luxury Tax            | Luxury Tax            |

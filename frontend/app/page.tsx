@@ -56,7 +56,10 @@ const AVAILABLE_PERSONAS = [
   { value: "The Wall Street Shark: Aggressive, purely capitalist, speaks arrogantly, never gives gifts, highly focused on monopolies.", label: "🦈 The Wall Street Shark" },
   { value: "The Cooperative Diplomat: Seeks harmony, proposes alliances, uses polite and diplomatic language.", label: "🕊️ The Cooperative Diplomat" },
   { value: "The Underground Hustler: Street-smart, seeks to bypass rules, proposes secret deals and collusions, uses slang.", label: "🕶️ The Underground Hustler" },
-  { value: "The Old-Money Aristocrat: Rich heir, despises small transactions, only allies with 'worthy' opponents, highly formal language.", label: "🎩 The Old-Money Aristocrat" }
+  { value: "The Old-Money Aristocrat: Rich heir, despises small transactions, only allies with 'worthy' opponents, highly formal language.", label: "🎩 The Old-Money Aristocrat" },
+  { value: "The Conservative Steward: Protects liquidity and seeks durable, low-volatility gains. Trades only when the benefit is clear and material, avoids speculative purchases and overextension, maintains a cash reserve, and speaks calmly and cautiously.", label: "🛡️ The Conservative Steward" },
+  { value: "The Zen Drifter: Calm, unhurried, and takes whatever the dice bring. Has little interest in trading - rarely proposes deals and usually lets offers pass. Buys what it lands on when it feels right, and when it can build and has spare cash, casually adds a house - but never rushes, never overextends, and never chases hotels.", label: "🧘 The Zen Drifter" },
+  { value: "The Independent Monopoly Builder: Focuses on winning through its own purchases, auctions, property development, and long-term ownership. It does not routinely use trades to complete color groups or rearrange the board. It rarely proposes or accepts a trade merely to block a rival, drain a rival's cash, break their progress, or slow down their path to victory. ", label: "🏗️ The Independent Monopoly Builder" }
 ];
 
 const AGENT_COLORS = [
@@ -90,7 +93,6 @@ export default function Dashboard() {
   // --- RESEARCH PARAMETERS ---
   const [temperature, setTemperature] = useState<number>(0.5);
   const [seed, setSeed] = useState<number | "">("");
-  const [scenario, setScenario] = useState<string>("default");
   
   const [agentsConfig, setAgentsConfig] = useState<AgentConfig[]>([
     { id: 0, name: "Agent_Alpha", model: "llama3:latest", persona: AVAILABLE_PERSONAS[0].value },
@@ -129,8 +131,7 @@ export default function Dashboard() {
         action: "INIT",
         players: agentsConfig,
         temperature: temperature,
-        seed: seed !== "" ? Number(seed) : null,
-        scenario: scenario
+        seed: seed !== "" ? Number(seed) : null
       };
       wsRef.current.send(JSON.stringify(initPayload));
     }
@@ -235,23 +236,6 @@ export default function Dashboard() {
                 </div>
                 <p className="text-[10px] text-gray-500 mt-1">Set a fixed seed (e.g. 42) to run exact counterfactual trials.</p>
               </div>
-
-              {/* --- NEW: SCENARIO SELECTOR --- */}
-              <div>
-                <label className="text-xs text-fuchsia-400 uppercase font-bold block mb-2">
-                  Geopolitical Scenario (Phase 3)
-                </label>
-                <select 
-                  value={scenario} 
-                  onChange={(e) => setScenario(e.target.value)}
-                  className="w-full bg-gray-900 border border-fuchsia-900/50 rounded p-2 text-sm text-fuchsia-100 focus:border-fuchsia-500 focus:outline-none"
-                >
-                  <option value="default">🌍 Default (Start from Turn 0)</option>
-                  <option value="scenario_buffer_state">🛡️ Scenario A: The Buffer State (3 Strong vs 1 Weak)</option>
-                </select>
-                <p className="text-[10px] text-gray-500 mt-1">Force late-game states to observe collusion. (Requires 4+ players)</p>
-              </div>
-              {/* -------------------------------------- */}
             </div>
           </div>
 

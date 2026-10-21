@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,41 +16,41 @@
 </head>
 <body>
 
-    <h2>Microscope de Simulation (WebSocket Test)</h2>
-    <div id="status" class="disconnected">🔴 Déconnecté</div>
+    <h2>Simulation Microscope (WebSocket Test)</h2>
+    <div id="status" class="disconnected">🔴 Disconnected</div>
     
-    <button id="next-turn-btn" disabled>👉 Lancer le Tour Suivant</button>
+    <button id="next-turn-btn" disabled>👉 Run Next Turn</button>
     
-    <h3>Flux de données en direct (JSON) :</h3>
-    <pre id="json-output">En attente de données...</pre>
+    <h3>Live data stream (JSON):</h3>
+    <pre id="json-output">Waiting for data...</pre>
 
     <script>
-        // 1. Connexion au serveur FastAPI
+        // 1. Connect to the FastAPI server
         const ws = new WebSocket("ws://127.0.0.1:8000/ws/simulation");
         const statusDiv = document.getElementById("status");
         const btn = document.getElementById("next-turn-btn");
         const output = document.getElementById("json-output");
 
-        // 2. Gestion des événements WebSocket
+        // 2. WebSocket event handling
         ws.onopen = function(event) {
-            statusDiv.innerHTML = "🟢 Connecté au Moteur Monopoly";
+            statusDiv.innerHTML = "🟢 Connected to the Monopoly Engine";
             statusDiv.className = "connected";
             btn.disabled = false;
         };
 
         ws.onmessage = function(event) {
-            // Formatage du JSON reçu pour qu'il soit lisible
+            // Pretty-print the received JSON
             const data = JSON.parse(event.data);
             output.innerHTML = JSON.stringify(data, null, 4);
         };
 
         ws.onclose = function(event) {
-            statusDiv.innerHTML = "🔴 Déconnecté (Le serveur est éteint ?)";
+            statusDiv.innerHTML = "🔴 Disconnected (is the server down?)";
             statusDiv.className = "disconnected";
             btn.disabled = true;
         };
 
-        // 3. Envoi de l'ordre d'action au Moteur
+        // 3. Send the action command to the Engine
         btn.onclick = function() {
             ws.send("NEXT_TURN");
         };

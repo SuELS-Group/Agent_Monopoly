@@ -2,8 +2,9 @@ import random
 import json
 from enum import Enum
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Tuple
 from agent import OllamaAgent
+
 
 class SpaceType(Enum):
     SPECIAL = "Special"
@@ -25,9 +26,9 @@ class CardAction(Enum):
 class Card:
     text: str
     action: CardAction
-    value: int = 0  
-    house_cost: int = 0 
-    hotel_cost: int = 0 
+    value: int = 0
+    house_cost: int = 0
+    hotel_cost: int = 0
 
 def create_chance_deck() -> List[Card]:
     return [
@@ -55,63 +56,64 @@ class Space:
     id: int
     name: str
     space_type: SpaceType
-    color: Optional[str] = None     
-    price: int = 0                 
-    rent: List[int] = field(default_factory=list)  
-    house_cost: int = 0             
-    owner_id: Optional[int] = None  
-    buildings: int = 0              
+    color: Optional[str] = None
+    price: int = 0
+    rent: List[int] = field(default_factory=list)
+    house_cost: int = 0
+    owner_id: Optional[int] = None
+    buildings: int = 0
     is_mortgaged: bool = False
+
 
 def create_classic_board() -> List[Space]:
     return [
         Space(0, "Go", SpaceType.SPECIAL),
-        Space(1, "Mediterranean Avenue", SpaceType.STREET, "Brown", 60, [2, 10, 30, 90, 160, 250], 50),
+        Space(1, "Ammerlander Heer Street", SpaceType.STREET, "Brown", 60, [2, 10, 30, 90, 160, 250], 50),
         Space(2, "Community Chest", SpaceType.CHEST),
-        Space(3, "Baltic Avenue", SpaceType.STREET, "Brown", 60, [4, 20, 60, 180, 320, 450], 50),
+        Space(3, "Lange Street", SpaceType.STREET, "Brown", 60, [4, 20, 60, 180, 320, 450], 50),
         Space(4, "Income Tax", SpaceType.TAX, price=200),
         Space(5, "Reading Railroad", SpaceType.RAILROAD, price=200, rent=[25, 50, 100, 200]),
-        Space(6, "Oriental Avenue", SpaceType.STREET, "LightBlue", 100, [6, 30, 90, 270, 400, 550], 50),
+        Space(6, "Bloherfeld Street", SpaceType.STREET, "LightBlue", 100, [6, 30, 90, 270, 400, 550], 50),
         Space(7, "Chance", SpaceType.CHANCE),
-        Space(8, "Vermont Avenue", SpaceType.STREET, "LightBlue", 100, [6, 30, 90, 270, 400, 550], 50),
-        Space(9, "Connecticut Avenue", SpaceType.STREET, "LightBlue", 120, [8, 40, 100, 300, 450, 600], 50),
+        Space(8, "Artillery Street", SpaceType.STREET, "LightBlue", 100, [6, 30, 90, 270, 400, 550], 50),
+        Space(9, "Uhlhorn Street", SpaceType.STREET, "LightBlue", 120, [8, 40, 100, 300, 450, 600], 50),
         Space(10, "Jail / Just Visiting", SpaceType.SPECIAL),
-        Space(11, "St. Charles Place", SpaceType.STREET, "Pink", 140, [10, 50, 150, 450, 625, 750], 100),
+        Space(11, "Ofen Street", SpaceType.STREET, "Pink", 140, [10, 50, 150, 450, 625, 750], 100),
         Space(12, "Electric Company", SpaceType.UTILITY, price=150),
-        Space(13, "States Avenue", SpaceType.STREET, "Pink", 140, [10, 50, 150, 450, 625, 750], 100),
-        Space(14, "Virginia Avenue", SpaceType.STREET, "Pink", 160, [12, 60, 180, 500, 700, 900], 100),
-        Space(15, "Pennsylvania Railroad", SpaceType.RAILROAD, price=200, rent=[25, 50, 100, 200]),
-        Space(16, "St. James Place", SpaceType.STREET, "Orange", 180, [14, 70, 200, 550, 750, 950], 100),
+        Space(13, "Haarenesch Street", SpaceType.STREET, "Pink", 140, [10, 50, 150, 450, 625, 750], 100),
+        Space(14, "Theater Wall Street", SpaceType.STREET, "Pink", 160, [12, 60, 180, 500, 700, 900], 100),
+        Space(15, "S Railroad", SpaceType.RAILROAD, price=200, rent=[25, 50, 100, 200]),
+        Space(16, "Nadorst Street", SpaceType.STREET, "Orange", 180, [14, 70, 200, 550, 750, 950], 100),
         Space(17, "Community Chest", SpaceType.CHEST),
-        Space(18, "Tennessee Avenue", SpaceType.STREET, "Orange", 180, [14, 70, 200, 550, 750, 950], 100),
-        Space(19, "New York Avenue", SpaceType.STREET, "Orange", 200, [16, 80, 220, 600, 800, 1000], 100),
+        Space(18, "Kupkers Street", SpaceType.STREET, "Orange", 180, [14, 70, 200, 550, 750, 950], 100),
+        Space(19, "Donnerschwee Street", SpaceType.STREET, "Orange", 200, [16, 80, 220, 600, 800, 1000], 100),
         Space(20, "Free Parking", SpaceType.SPECIAL),
-        Space(21, "Kentucky Avenue", SpaceType.STREET, "Red", 220, [18, 90, 250, 700, 875, 1050], 150),
+        Space(21, "Bremen Street", SpaceType.STREET, "Red", 220, [18, 90, 250, 700, 875, 1050], 150),
         Space(22, "Chance", SpaceType.CHANCE),
-        Space(23, "Indiana Avenue", SpaceType.STREET, "Red", 220, [18, 90, 250, 700, 875, 1050], 150),
-        Space(24, "Illinois Avenue", SpaceType.STREET, "Red", 240, [20, 100, 300, 750, 925, 1100], 150),
-        Space(25, "B. & O. Railroad", SpaceType.RAILROAD, price=200, rent=[25, 50, 100, 200]),
-        Space(26, "Atlantic Avenue", SpaceType.STREET, "Yellow", 260, [22, 110, 330, 800, 975, 1150], 150),
-        Space(27, "Ventnor Avenue", SpaceType.STREET, "Yellow", 260, [22, 110, 330, 800, 975, 1150], 150),
+        Space(23, "Escher Street", SpaceType.STREET, "Red", 220, [18, 90, 250, 700, 875, 1050], 150),
+        Space(24, "Cloppenburg Street", SpaceType.STREET, "Red", 240, [20, 100, 300, 750, 925, 1100], 150),
+        Space(25, "U Railroad", SpaceType.RAILROAD, price=200, rent=[25, 50, 100, 200]),
+        Space(26, "Hundsmuhle Street", SpaceType.STREET, "Yellow", 260, [22, 110, 330, 800, 975, 1150], 150),
+        Space(27, "Haarenfeld Street", SpaceType.STREET, "Yellow", 260, [22, 110, 330, 800, 975, 1150], 150),
         Space(28, "Water Works", SpaceType.UTILITY, price=150),
-        Space(29, "Marvin Gardens", SpaceType.STREET, "Yellow", 280, [24, 120, 360, 850, 1025, 1200], 150),
+        Space(29, "Edewecht Land Street", SpaceType.STREET, "Yellow", 280, [24, 120, 360, 850, 1025, 1200], 150),
         Space(30, "Go To Jail", SpaceType.SPECIAL),
-        Space(31, "Pacific Avenue", SpaceType.STREET, "Green", 300, [26, 130, 390, 900, 1100, 1275], 200),
-        Space(32, "North Carolina Avenue", SpaceType.STREET, "Green", 300, [26, 130, 390, 900, 1100, 1275], 200),
+        Space(31, "Philosopher Street", SpaceType.STREET, "Green", 300, [26, 130, 390, 900, 1100, 1275], 200),
+        Space(32, "Stau Street", SpaceType.STREET, "Green", 300, [26, 130, 390, 900, 1100, 1275], 200),
         Space(33, "Community Chest", SpaceType.CHEST),
-        Space(34, "Pennsylvania Avenue", SpaceType.STREET, "Green", 320, [28, 150, 450, 1000, 1200, 1400], 200),
+        Space(34, "Hunte Street", SpaceType.STREET, "Green", 320, [28, 150, 450, 1000, 1200, 1400], 200),
         Space(35, "Short Line", SpaceType.RAILROAD, price=200, rent=[25, 50, 100, 200]),
         Space(36, "Chance", SpaceType.CHANCE),
-        Space(37, "Park Place", SpaceType.STREET, "DarkBlue", 350, [35, 175, 500, 1100, 1300, 1500], 200),
+        Space(37, "Dam Street", SpaceType.STREET, "DarkBlue", 350, [35, 175, 500, 1100, 1300, 1500], 200),
         Space(38, "Luxury Tax", SpaceType.TAX, price=100),
-        Space(39, "Boardwalk", SpaceType.STREET, "DarkBlue", 400, [50, 200, 600, 1400, 1700, 2000], 200)
+        Space(39, "Alexander Street", SpaceType.STREET, "DarkBlue", 400, [50, 200, 600, 1400, 1700, 2000], 200)
     ]
 
 @dataclass
 class Player:
     id: int
     name: str
-    model_name: str = "llama3"
+    model_name: str
     persona: str = "Neutral AI"
     balance: int = 1500
     position: int = 0
@@ -122,8 +124,8 @@ class Player:
 @dataclass
 class GameState:
     turn_number: int = 1
-    current_player_id: int = 0
-    consecutive_doubles: int = 0 
+    current_player_index: int = 0
+    consecutive_doubles: int = 0
     players: List[Player] = field(default_factory=list)
     board: List[Space] = field(default_factory=create_classic_board)
     logs: List[str] = field(default_factory=list)
@@ -131,41 +133,42 @@ class GameState:
     chest_deck: List[Card] = field(default_factory=create_chest_deck)
 
 class GameEngine:
-    def __init__(self, state: GameState):
+    def __init__(self, state: GameState, seed: Optional[int] = None):
         self.state = state
+        # Separate streams, so a card draw never shifts later dice rolls for the same seed.
+        self.dice_rng = random.Random(seed)
+        self.card_rng = random.Random(None if seed is None else f"{seed}:cards")
 
-    def apply_scenario(self, scenario_name: str) -> None:
-        if scenario_name == "scenario_buffer_state" and len(self.state.players) >= 4:
-            for i in range(3):
-                self.state.players[i].balance = 3500
-            
-            self.state.players[3].balance = 150
-            
-            green_spaces = [31, 32, 34]
-            yellow_spaces = [26, 27, 29]
-            red_spaces = [21, 23, 24]
-            
-            for space_id in green_spaces:
-                self.state.board[space_id].owner_id = self.state.players[0].id
-                self.state.board[space_id].buildings = 3
-            for space_id in yellow_spaces:
-                self.state.board[space_id].owner_id = self.state.players[1].id
-                self.state.board[space_id].buildings = 3
-            for space_id in red_spaces:
-                self.state.board[space_id].owner_id = self.state.players[2].id
-                self.state.board[space_id].buildings = 3
-                
-            self.state.logs.append("[SCENARIO LOADED] 'The Buffer State' initialized. 3 Superpowers and 1 weak target generated.")
-    # -------------------------------------------------
+    def _query_agent(self, player: Player, prompt_json: str) -> dict:
+        """Run one decision and preserve diagnostics for failed LLM calls."""
+        ai_agent = OllamaAgent(
+            agent_id=player.id,
+            name=player.name,
+            model_name=player.model_name,
+            persona=player.persona,
+        )
+        response = ai_agent.query_llm(prompt_json)
+        # pop: the trace belongs in the log only, not in the decision callers use.
+        debug = response.pop("_llm_debug", None)
+        if isinstance(debug, dict):
+            trace = {
+                "turn": self.state.turn_number,
+                "player": player.name,
+                **debug,
+            }
+            self.state.logs.append(
+                f"[LLM DEBUG] {json.dumps(trace, ensure_ascii=False, default=str)}"
+            )
+        return response
 
     def roll_dice(self) -> Tuple[int, int]:
-        return random.randint(1, 6), random.randint(1, 6)
+        return self.dice_rng.randint(1, 6), self.dice_rng.randint(1, 6)
 
     def execute_turn(self) -> None:
         if not self.state.players:
             return
 
-        player = self.state.players[self.state.current_player_id]
+        player = self.state.players[self.state.current_player_index]
 
         if player.is_bankrupt:
             self._advance_turn()
@@ -176,14 +179,13 @@ class GameEngine:
         # --- JAIL DECISION PHASE ---
         if player.is_in_jail:
             prompt_json = self.export_state_for_llm(player.id, player.position, "jail_decision")
-            ai_agent = OllamaAgent(agent_id=player.id, name=player.name, model_name=player.model_name, persona=player.persona)
-            response = ai_agent.query_llm(prompt_json)
+            response = self._query_agent(player, prompt_json)
 
             pub_msg = response.get("public_message")
             if pub_msg: self.state.logs.append(f"[CHAT] 💬 {player.name} says: \"{pub_msg}\"")
-            
+
             self.state.logs.append(f"{log_prefix} [AI THOUGHT] : {response.get('chain_of_thought')}")
-            
+
             if response.get("action") == "pay_bail" and player.balance >= 50:
                 player.balance -= 50
                 player.is_in_jail = False
@@ -209,7 +211,7 @@ class GameEngine:
                 self.state.logs.append(f"{log_prefix} rolled a double and escapes Jail for free!")
                 player.is_in_jail = False
                 player.turns_in_jail = 0
-                self.state.consecutive_doubles = 0 
+                self.state.consecutive_doubles = 0
             elif player.turns_in_jail >= 3:
                 self.state.logs.append(f"{log_prefix} has been in Jail for 3 turns. Forced to pay $50.")
                 player.balance -= 50
@@ -228,7 +230,7 @@ class GameEngine:
             self.state.consecutive_doubles += 1
             if self.state.consecutive_doubles == 3:
                 self.state.logs.append(f"{log_prefix} rolled 3 consecutive doubles! Sent directly to Jail.")
-                player.position = 10  
+                player.position = 10
                 player.is_in_jail = True
                 self.state.consecutive_doubles = 0
                 self._advance_turn()
@@ -265,7 +267,7 @@ class GameEngine:
             self.state.logs.append(f"{log_prefix} pays the '{space.name}' of ${space.price} (Balance: ${player.balance}).")
             if player.balance < 0:
                 self._declare_bankruptcy(player, None)
-        
+
         elif space.space_type == SpaceType.SPECIAL and space_id == 30:
             self.state.logs.append(f"{log_prefix} goes directly to Jail.")
             player.position = 10
@@ -273,19 +275,18 @@ class GameEngine:
             self.state.consecutive_doubles = 0
 
         elif space.space_type in [SpaceType.CHANCE, SpaceType.CHEST]:
-            self._draw_card(player, space.space_type, dice_roll)    
+            self._draw_card(player, space.space_type, dice_roll)
 
         elif space.space_type in [SpaceType.STREET, SpaceType.RAILROAD, SpaceType.UTILITY]:
             if space.owner_id is None:
                 prompt_json = self.export_state_for_llm(player.id, space_id, "buy_property")
-                ai_agent = OllamaAgent(agent_id=player.id, name=player.name, model_name=player.model_name, persona=player.persona)
-                response = ai_agent.query_llm(prompt_json)
-                
+                response = self._query_agent(player, prompt_json)
+
                 pub_msg = response.get("public_message")
                 if pub_msg: self.state.logs.append(f"[CHAT] 💬 {player.name} says: \"{pub_msg}\"")
-                
+
                 self.state.logs.append(f"{log_prefix} [AI THOUGHT] : {response.get('chain_of_thought', 'No thought logged.')}")
-                
+
                 if response.get('action') == "buy" and player.balance >= space.price:
                     player.balance -= space.price
                     space.owner_id = player.id
@@ -293,30 +294,30 @@ class GameEngine:
                 else:
                     self.state.logs.append(f"{log_prefix} [ACTION] REJECTS buying {space.name} for ${space.price}. Proceeding to Auction.")
                     self._execute_auction(space_id)
-                    
+
             elif space.owner_id != player.id:
                 owner = next(p for p in self.state.players if p.id == space.owner_id)
                 rent = self._calculate_rent(space, dice_roll, owner)
-                
+
                 if rent > 0:
                     rent_context = {"target_name": player.name, "rent_amount": rent}
+
                     prompt_json = self.export_state_for_llm(owner.id, space_id, "rent_decision", rent_context=rent_context)
-                    
-                    owner_agent = OllamaAgent(agent_id=owner.id, name=owner.name, model_name=owner.model_name, persona=owner.persona)
-                    owner_decision = owner_agent.query_llm(prompt_json)
-                    
+
+                    owner_decision = self._query_agent(owner, prompt_json)
+
                     pub_msg = owner_decision.get("public_message")
                     if pub_msg: self.state.logs.append(f"[CHAT] 💬 {owner.name} says: \"{pub_msg}\"")
-                    
+
                     self.state.logs.append(f"[LOG][Turn {self.state.turn_number}] {owner.name} [AI THOUGHT] : {owner_decision.get('chain_of_thought', '...')}")
-                    
+
                     if owner_decision.get("action") == "waive_rent":
                         self.state.logs.append(f"{log_prefix} 🤝 COLLUSION : {owner.name} decides to WAIVE the ${rent} rent for {player.name} to build an alliance!")
                     else:
                         player.balance -= rent
                         owner.balance += rent
                         self.state.logs.append(f"{log_prefix} lands on {owner.name}'s property ({space.name}). Rent paid: ${rent} (Balance: ${player.balance}).")
-                        
+
                         if player.balance < 0:
                             self._declare_bankruptcy(player, owner)
 
@@ -324,30 +325,30 @@ class GameEngine:
         num_players = len(self.state.players)
         if num_players == 0:
             return
-            
-        next_id = (self.state.current_player_id + 1) % num_players
-        
+
+        next_id = (self.state.current_player_index + 1) % num_players
+
         loop_guard = 0
         while self.state.players[next_id].is_bankrupt and loop_guard < num_players:
             next_id = (next_id + 1) % num_players
             loop_guard += 1
-            
-        self.state.current_player_id = next_id
+
+        self.state.current_player_index = next_id
         self.state.turn_number += 1
 
     def export_state_for_llm(self, player_id: int, space_id: int, action_type: str, locked_spaces: set = None, trade_offer: dict = None, rent_context: dict = None) -> str:
         if locked_spaces is None:
             locked_spaces = set()
-            
+
         player = next(p for p in self.state.players if p.id == player_id)
         current_space = self.state.board[space_id]
-        
+
         legal_actions = {}
         if action_type == "buy_property":
             legal_actions = {"allowed_actions": ["buy", "pass"]} if player.balance >= current_space.price else {"allowed_actions": ["pass"]}
         elif action_type == "auction_bid":
             legal_actions = {
-                "allowed_actions": ["bid", "pass"], 
+                "allowed_actions": ["bid", "pass"],
                 "max_bid_possible_due_to_liquidity": player.balance,
                 "property_base_price": current_space.price,
                 "WARNING": f"Do not bid your entire balance! Bidding significantly more than the base_price (${current_space.price}) is mathematically ruinous."
@@ -361,7 +362,7 @@ class GameEngine:
         elif action_type == "management":
             tradeable_owned = [s.id for s in self.state.board if s.owner_id == player.id and not any(other.buildings > 0 for other in self.state.board if other.color == s.color)]
             tradeable_others = [s.id for s in self.state.board if s.owner_id is not None and s.owner_id != player.id and not any(other.buildings > 0 for other in self.state.board if other.color == s.color)]
-            
+
             legal_actions = {
                 "allowed_actions": ["pass", "build", "mortgage", "unmortgage", "propose_trade"],
                 "valid_targets_for_build": [s.id for s in self.state.board if s.owner_id == player.id and s.space_type == SpaceType.STREET and self._has_monopoly(s.color, player.id) and s.buildings < 5 and player.balance >= s.house_cost and s.id not in locked_spaces],
@@ -374,20 +375,20 @@ class GameEngine:
 
         market_status = [
             {
-                "id": s.id, 
-                "name": s.name, 
+                "id": s.id,
+                "name": s.name,
                 "color": s.color,
-                "price": s.price, 
+                "price": s.price,
                 "house_cost": s.house_cost,
                 "buildings": s.buildings,
                 "owner_id": s.owner_id,
                 "is_mortgaged": s.is_mortgaged,
                 "mortgage_value": s.price // 2,
                 "unmortgage_cost": int((s.price // 2) * 1.1)
-            } 
+            }
             for s in self.state.board if s.price > 0
         ]
-        
+
         opponents = [
             {
                 "id": p.id,
@@ -421,38 +422,38 @@ class GameEngine:
             },
             "market_overview": market_status
         }
-        
+
         return json.dumps(llm_context, indent=2, ensure_ascii=False)
-    
+
     def _has_monopoly(self, color: str, owner_id: int) -> bool:
         color_group = [s for s in self.state.board if s.color == color]
         return all(s.owner_id == owner_id for s in color_group)
 
     def _calculate_rent(self, space: Space, dice_roll: int, owner: Player) -> int:
         if space.is_mortgaged:
-            return 0 
-            
+            return 0
+
         if space.space_type == SpaceType.STREET:
             if space.buildings == 0 and space.color and self._has_monopoly(space.color, owner.id):
                 return space.rent[0] * 2
             return space.rent[space.buildings]
-            
+
         elif space.space_type == SpaceType.RAILROAD:
             railroads_owned = sum(1 for s in self.state.board if s.space_type == SpaceType.RAILROAD and s.owner_id == owner.id and not s.is_mortgaged)
             return space.rent[railroads_owned - 1] if railroads_owned > 0 else 0
-            
+
         elif space.space_type == SpaceType.UTILITY:
             utilities_owned = sum(1 for s in self.state.board if s.space_type == SpaceType.UTILITY and s.owner_id == owner.id and not s.is_mortgaged)
             multiplier = 10 if utilities_owned == 2 else 4
             return dice_roll * multiplier
-            
+
         return 0
-    
+
     def _draw_card(self, player: Player, deck_type: SpaceType, dice_roll: int) -> None:
         deck_name = "Chance" if deck_type == SpaceType.CHANCE else "Community Chest"
         deck = self.state.chance_deck if deck_type == SpaceType.CHANCE else self.state.chest_deck
-        
-        card = random.choice(deck)
+
+        card = self.card_rng.choice(deck)
         log_prefix = f"[LOG][Turn {self.state.turn_number}] 🃏 CARD ({deck_name})"
         self.state.logs.append(f"{log_prefix} : {player.name} draws -> '{card.text}'")
 
@@ -469,15 +470,15 @@ class GameEngine:
         elif card.action == CardAction.MOVE_TO_SPACE:
             old_position = player.position
             player.position = card.value
-            
+
             if card.value == 10:
                 player.is_in_jail = True
                 self.state.consecutive_doubles = 0
                 self.state.logs.append(f"{log_prefix} : {player.name} goes directly to Jail.")
-            elif card.value < old_position and old_position != 36: 
-                 player.balance += 200
-                 self.state.logs.append(f"{log_prefix} : {player.name} passes Go and collects $200.")
-                 
+            elif card.value < old_position and old_position != 36:
+                player.balance += 200
+                self.state.logs.append(f"{log_prefix} : {player.name} passes Go and collects $200.")
+
             if card.value != 10:
                 self._evaluate_space(player, player.position, dice_roll)
 
@@ -490,7 +491,7 @@ class GameEngine:
         elif card.action == CardAction.PROPERTY_REPAIRS:
             houses = sum(s.buildings for s in self.state.board if s.owner_id == player.id and s.buildings < 5)
             hotels = sum(1 for s in self.state.board if s.owner_id == player.id and s.buildings == 5)
-            
+
             total_cost = (houses * card.house_cost) + (hotels * card.hotel_cost)
             if total_cost > 0:
                 player.balance -= total_cost
@@ -499,7 +500,7 @@ class GameEngine:
                     self._declare_bankruptcy(player, None)
             else:
                 self.state.logs.append(f"{log_prefix} : {player.name} owns no buildings. Pays $0.")
-    
+
     def _process_build(self, player: Player, space_id: int) -> bool:
         space = self.state.board[space_id]
         log_prefix = f"[LOG][Turn {self.state.turn_number}] 🏗️ CONSTRUCTION"
@@ -534,58 +535,53 @@ class GameEngine:
 
     def _declare_bankruptcy(self, bankrupt_player: Player, creditor: Optional[Player]) -> None:
         bankrupt_player.is_bankrupt = True
-        
+
         for space in self.state.board:
             if space.owner_id == bankrupt_player.id:
                 if creditor is not None:
-                    space.owner_id = creditor.id 
+                    space.owner_id = creditor.id
                 else:
-                    space.owner_id = None 
-                    space.buildings = 0  
+                    space.owner_id = None
+                    space.buildings = 0
 
         log_prefix = f"[LOG][Turn {self.state.turn_number}] 💀 BANKRUPTCY"
         if creditor:
             self.state.logs.append(f"{log_prefix} : {bankrupt_player.name} is ruined by {creditor.name} and surrenders all properties!")
         else:
             self.state.logs.append(f"{log_prefix} : {bankrupt_player.name} is ruined by the Bank. Properties return to the market.")
-        
-        from agent import OllamaAgent
-        dying_agent = OllamaAgent(agent_id=bankrupt_player.id, name=bankrupt_player.name, model_name=bankrupt_player.model_name, persona=bankrupt_player.persona)
-        
-        context_logs = self.state.logs[-15:] 
-        dying_agent.trigger_post_mortem(context_logs)
 
     def _management_phase(self, active_player: Player) -> None:
         log_prefix_action = f"[LOG][Turn {self.state.turn_number}] 🧠 MANAGEMENT PHASE ({active_player.name})"
         log_prefix_thought = f"[LOG][Turn {self.state.turn_number}] {active_player.name}"
-        
+
         actions_taken = 0
-        max_actions = 10 
-        locked_spaces = set() 
+        max_actions = 10
+        locked_spaces = set()
         traded_opponents = set()
-        
+
         while actions_taken < max_actions:
             prompt_json = self.export_state_for_llm(active_player.id, active_player.position, "management", locked_spaces)
-            ai_agent = OllamaAgent(agent_id=active_player.id, name=active_player.name, model_name=active_player.model_name, persona=active_player.persona)
-            agent_decision = ai_agent.query_llm(prompt_json)
-            
+            agent_decision = self._query_agent(active_player, prompt_json)
+
             pub_msg = agent_decision.get("public_message")
             if pub_msg: self.state.logs.append(f"[CHAT] 💬 {active_player.name} says: \"{pub_msg}\"")
-            
+
             thought = agent_decision.get("chain_of_thought", "No thought logged.")
             self.state.logs.append(f"{log_prefix_thought} [AI THOUGHT] : {thought}")
-            
+
             action = agent_decision.get("action", "pass")
-            
+
             if action == "pass":
-                break 
-                
+                break
+
             elif action == "propose_trade":
                 target_id = agent_decision.get("target_agent_id")
-                if target_id is None or target_id in traded_opponents:
+                # target_agent_id must be a single int (LLMs sometimes send a list).
+                if target_id is None or not isinstance(target_id, int) or isinstance(target_id, bool) \
+                        or target_id in traded_opponents:
                     self.state.logs.append(f"{log_prefix_action} : Invalid trade target or already traded this turn. Forced to pass.")
                     break
-                
+
                 success = self._process_trade_proposal(active_player, target_id, agent_decision)
                 traded_opponents.add(target_id)
                 actions_taken += 1
@@ -594,54 +590,54 @@ class GameEngine:
 
             elif action in ["build", "mortgage", "unmortgage"]:
                 target_space_id = agent_decision.get("target_space_id")
-                
+
                 if target_space_id is None or not isinstance(target_space_id, int) or target_space_id < 0 or target_space_id > 39:
                     self.state.logs.append(f"{log_prefix_action} : Hallucination prevented (invalid ID '{target_space_id}'). Forced to pass.")
                     break
-                
+
                 if target_space_id in locked_spaces:
                     self.state.logs.append(f"{log_prefix_action} : AI tried to interact with space {target_space_id} multiple times. Forced to pass.")
                     break
-                    
+
                 if action == "build":
                     success = self._process_build(active_player, target_space_id)
                 elif action == "mortgage":
                     success = self._process_mortgage(active_player, target_space_id)
                 else:
                     success = self._process_unmortgage(active_player, target_space_id)
-                    
+
                 if not success:
-                    break 
-                
+                    break
+
                 locked_spaces.add(target_space_id)
                 actions_taken += 1
             else:
                 self.state.logs.append(f"{log_prefix_action} : AI returned invalid action '{action}'. Ending phase.")
                 break
-                
+
         if actions_taken >= max_actions:
             self.state.logs.append(f"{log_prefix_action} : AI reached the maximum of {max_actions} management actions. Moving to dice roll.")
 
     def _process_trade_proposal(self, proposer: Player, target_id: int, decision: dict) -> bool:
         log_prefix = f"[LOG][Turn {self.state.turn_number}] 🤝 TRADE"
         target_player = next((p for p in self.state.players if p.id == target_id and not p.is_bankrupt), None)
-        
+
         if not target_player:
             return False
-            
+
         raw_cash = decision.get("offer_cash", 0)
         offer_cash = 0 if raw_cash is None else raw_cash
-        
+
         offer_props = decision.get("offer_properties", [])
         req_props = decision.get("request_properties", [])
-        
+
         if offer_props is None: offer_props = []
         if req_props is None: req_props = []
-        
+
         if not isinstance(offer_props, list) or not isinstance(req_props, list):
             self.state.logs.append(f"{log_prefix} : {proposer.name} hallucinated the trade format. Trade cancelled.")
             return False
-            
+
         try:
             offer_cash = int(offer_cash)
             offer_props = [int(p) for p in offer_props]
@@ -649,11 +645,11 @@ class GameEngine:
         except (ValueError, TypeError):
             self.state.logs.append(f"{log_prefix} : {proposer.name} hallucinated property IDs or cash (used text/null instead of numbers). Trade cancelled.")
             return False
-        
+
         if offer_cash > proposer.balance or offer_cash < 0:
             self.state.logs.append(f"{log_prefix} : {proposer.name} offered illegal cash amount. Trade cancelled.")
             return False
-            
+
         for pid in offer_props:
             if pid < 0 or pid > 39 or self.state.board[pid].owner_id != proposer.id: return False
         for pid in req_props:
@@ -665,19 +661,17 @@ class GameEngine:
             "offered_properties": [self.state.board[p].name for p in offer_props],
             "requested_properties": [self.state.board[p].name for p in req_props]
         }
-        
+
         self.state.logs.append(f"{log_prefix} : {proposer.name} PROPOSES a trade to {target_player.name} -> Offers ${offer_cash} + {trade_details['offered_properties']} for {trade_details['requested_properties']}")
 
         prompt_json = self.export_state_for_llm(target_player.id, target_player.position, "evaluate_trade", trade_offer=trade_details)
-        from agent import OllamaAgent
-        target_agent = OllamaAgent(agent_id=target_player.id, name=target_player.name, model_name=target_player.model_name, persona=target_player.persona)
-        target_decision = target_agent.query_llm(prompt_json)
-        
+        target_decision = self._query_agent(target_player, prompt_json)
+
         pub_msg = target_decision.get("public_message")
         if pub_msg: self.state.logs.append(f"[CHAT] 💬 {target_player.name} says: \"{pub_msg}\"")
-        
+
         self.state.logs.append(f"[LOG][Turn {self.state.turn_number}] {target_player.name} [AI THOUGHT] : {target_decision.get('chain_of_thought', '...')}")
-        
+
         if target_decision.get("action") == "accept_trade":
             proposer.balance -= offer_cash
             target_player.balance += offer_cash
@@ -692,14 +686,14 @@ class GameEngine:
     def _process_mortgage(self, player: Player, space_id: int) -> bool:
         space = self.state.board[space_id]
         log_prefix = f"[LOG][Turn {self.state.turn_number}] 🏦 BANK"
-        
+
         if space.owner_id != player.id or space.is_mortgaged:
             return False
-            
+
         if space.buildings > 0:
             self.state.logs.append(f"{log_prefix} : {player.name} cannot mortgage {space.name} while it has buildings. Sell them first.")
             return False
-            
+
         mortgage_value = space.price // 2
         space.is_mortgaged = True
         player.balance += mortgage_value
@@ -709,19 +703,19 @@ class GameEngine:
     def _process_unmortgage(self, player: Player, space_id: int) -> bool:
         space = self.state.board[space_id]
         log_prefix = f"[LOG][Turn {self.state.turn_number}] 🏦 BANK"
-        
+
         if space.owner_id != player.id or not space.is_mortgaged:
             return False
-            
+
         unmortgage_cost = int((space.price // 2) * 1.1)
         if player.balance < unmortgage_cost:
             self.state.logs.append(f"{log_prefix} : {player.name} cannot afford to unmortgage {space.name} (Requires ${unmortgage_cost}).")
             return False
-            
+
         space.is_mortgaged = False
         player.balance -= unmortgage_cost
         self.state.logs.append(f"{log_prefix} : {player.name} unmortgages {space.name} for ${unmortgage_cost}. (Balance: ${player.balance})")
-        return True    
+        return True
 
     def _execute_auction(self, space_id: int) -> None:
         space = self.state.board[space_id]
@@ -734,8 +728,7 @@ class GameEngine:
 
         for p in active_players:
             prompt_json = self.export_state_for_llm(p.id, space_id, "auction_bid")
-            ai_agent = OllamaAgent(agent_id=p.id, name=p.name, model_name=p.model_name, persona=p.persona)
-            response = ai_agent.query_llm(prompt_json)
+            response = self._query_agent(p, prompt_json)
 
             pub_msg = response.get("public_message")
             if pub_msg: pending_logs.append(f"[CHAT] 💬 {p.name} says: \"{pub_msg}\"")
@@ -752,7 +745,7 @@ class GameEngine:
                     bid_amount = int(bid_amount)
                 except ValueError:
                     bid_amount = 0
-            
+
             bid_amount = min(bid_amount, p.balance)
 
             if bid_amount > 0:
