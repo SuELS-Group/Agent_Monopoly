@@ -66,7 +66,6 @@ MISTRAL_SMALL = "mistral-small:24b"
 MISTRAL_NEMO = "mistral-nemo:12b"
 GEMMA = "gemma4:26b"
 GEMMA_SMALL = "gemma4:12b"
-GEMMA_LARGE = "gemma4:31b"
 
 
 # --- Series 0: model & capacity baseline -------------------------------------
@@ -153,7 +152,7 @@ def _series0_experiments():
 EXPERIMENTS = [
     # Each seed is a separate trial; P1 is the only player whose persona changes.
     {
-        "name": "1B_Conservative_Temp00_seed42",
+        "name": "1B_Mistral_Conservative_Temp00_seed42",
         "label": "Phase 1B - Mistral Conservative vs 3 Neutrals (temp 0.0, seed 42)",
         "temperature": 0.0,
         "seed": 42,
