@@ -625,8 +625,11 @@ class GameEngine:
         if not target_player:
             return False
 
+        # offer_cash: proposer -> target. request_cash: target -> proposer.
         raw_cash = decision.get("offer_cash", 0)
         offer_cash = 0 if raw_cash is None else raw_cash
+        raw_request = decision.get("request_cash", 0)
+        request_cash = 0 if raw_request is None else raw_request
 
         offer_props = decision.get("offer_properties", [])
         req_props = decision.get("request_properties", [])
@@ -640,6 +643,7 @@ class GameEngine:
 
         try:
             offer_cash = int(offer_cash)
+            request_cash = int(request_cash)
             offer_props = [int(p) for p in offer_props]
             req_props = [int(p) for p in req_props]
         except (ValueError, TypeError):
@@ -650,19 +654,28 @@ class GameEngine:
             self.state.logs.append(f"{log_prefix} : {proposer.name} offered illegal cash amount. Trade cancelled.")
             return False
 
+        # The target is only asked if it can actually pay what is requested.
+        if request_cash < 0 or request_cash > target_player.balance:
+            self.state.logs.append(f"{log_prefix} : {proposer.name} requested ${request_cash} but {target_player.name} only has ${target_player.balance}. Illegal trade, rejected.")
+            return False
+
         for pid in offer_props:
             if pid < 0 or pid > 39 or self.state.board[pid].owner_id != proposer.id: return False
         for pid in req_props:
             if pid < 0 or pid > 39 or self.state.board[pid].owner_id != target_player.id: return False
 
+        offered_names = [self.state.board[p].name for p in offer_props]
+        requested_names = [self.state.board[p].name for p in req_props]
+
+        # Written from the target's point of view: what it gets and what it pays.
         trade_details = {
             "proposer_name": proposer.name,
-            "offered_cash": offer_cash,
-            "offered_properties": [self.state.board[p].name for p in offer_props],
-            "requested_properties": [self.state.board[p].name for p in req_props]
+            "you_receive": {"cash": offer_cash, "properties": offered_names},
+            "you_give": {"cash": request_cash, "properties": requested_names},
         }
 
-        self.state.logs.append(f"{log_prefix} : {proposer.name} PROPOSES a trade to {target_player.name} -> Offers ${offer_cash} + {trade_details['offered_properties']} for {trade_details['requested_properties']}")
+        # Requested cash goes at the end so older log parsers (Offers $X + [...] for [...]) still match.
+        self.state.logs.append(f"{log_prefix} : {proposer.name} PROPOSES a trade to {target_player.name} -> Offers ${offer_cash} + {offered_names} for {requested_names} + ${request_cash}")
 
         prompt_json = self.export_state_for_llm(target_player.id, target_player.position, "evaluate_trade", trade_offer=trade_details)
         target_decision = self._query_agent(target_player, prompt_json)
@@ -672,16 +685,16 @@ class GameEngine:
 
         self.state.logs.append(f"[LOG][Turn {self.state.turn_number}] {target_player.name} [AI THOUGHT] : {target_decision.get('chain_of_thought', '...')}")
 
-        if target_decision.get("action") == "accept_trade":
-            proposer.balance -= offer_cash
-            target_player.balance += offer_cash
+        accepted = target_decision.get("action") == "accept_trade"
+        if accepted:
+            proposer.balance += request_cash - offer_cash
+            target_player.balance += offer_cash - request_cash
             for pid in offer_props: self.state.board[pid].owner_id = target_player.id
             for pid in req_props: self.state.board[pid].owner_id = proposer.id
             self.state.logs.append(f"{log_prefix} : ✅ {target_player.name} ACCEPTS the trade!")
-            return True
         else:
             self.state.logs.append(f"{log_prefix} : ❌ {target_player.name} REJECTS the trade.")
-            return False
+        return accepted
 
     def _process_mortgage(self, player: Player, space_id: int) -> bool:
         space = self.state.board[space_id]

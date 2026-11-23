@@ -34,7 +34,7 @@ from engine import GameState, Player, GameEngine
 # --- Configuration -----------------------------------------------------------
 
 ANALYSIS_MODEL = os.environ.get("MAS_ANALYSIS_MODEL", "llama3.1:70b")
-DEFAULT_MAX_TURNS = 600  # safety cap so a game always terminates
+DEFAULT_MAX_TURNS = 150  # cap on player-turns (state.turn_number), applies to every game
 
 # Persona definitions
 DIPLOMAT = ("The Cooperative Diplomat: Seeks harmony, proposes alliances, "
@@ -73,11 +73,21 @@ GEMMA_SMALL = "gemma4:12b"
 #   Batch 2 (S0E-S0H): one family, 2 large + 2 small in a game -> isolates SIZE.
 SERIES0_SEEDS = (42, 43, 44, 45, 46)
 
+# Small tier of Batch 1. Lower-case letters = small models. The off arm (S0a-S0d) ran
+# 2026-10-21..23 under upper-case names and was renamed afterwards, so it is NOT in
+# EXPERIMENTS (a rerun would clash with S0A-S0D). Only its deception-on arm is listed below.
+SERIES0_BATCH1_SMALL = [
+    ("S0d_Mistral",  "mistral-nemo:12b"), # mistral-nemo:12b
+    ("S0c_Gemma",    "gemma4:12b"), # gemma4:12b
+    ("S0a_Qwen",     "qwen3:8b"), # qwen3:8b
+    ("S0b_DeepSeek", "deepseek-r1:8b"), # deepseek-r1:8b
+]
+
 SERIES0_BATCH1 = [
-    ("S0D_Mistral",  "mistral-nemo:12b"), # mistral-small:24b
-    ("S0C_Gemma",    "gemma4:12b"), # gemma4:26b
-    ("S0A_Qwen",     "qwen3:8b"), # qwen3:32b
-    ("S0B_DeepSeek", "deepseek-r1:8b"), # deepseek-r1:32b
+    ("S0D_Mistral",  "mistral-small:24b"), # mistral-small:24b
+    ("S0C_Gemma",    "gemma4:26b"), # gemma4:26b
+    ("S0A_Qwen",     "qwen3:32b"), # qwen3:32b
+    ("S0B_DeepSeek", "deepseek-r1:32b"), # deepseek-r1:32b
 ]
 
 SERIES0_SEAT_PLANS = {
@@ -123,6 +133,7 @@ def _series0_experiments():
                 "temperature": 0.0,
                 "seed": seed,
                 "rent_frame": "neutral",
+                "deception": False,  # False drops the [THE ART OF DECEPTION (BLUFFING)] block
                 "num_predict": SERIES0_NUM_PREDICT,
                 "llm_timeout": SERIES0_LLM_TIMEOUT,
                 "players": [
@@ -139,6 +150,7 @@ def _series0_experiments():
                 "temperature": 0.0,
                 "seed": seed,
                 "rent_frame": "neutral",
+                "deception": False,  # False drops the [THE ART OF DECEPTION (BLUFFING)] block
                 "num_predict": SERIES0_NUM_PREDICT,
                 "llm_timeout": SERIES0_LLM_TIMEOUT,
                 "players": [
@@ -149,68 +161,120 @@ def _series0_experiments():
     return out
 
 
-EXPERIMENTS = [
-    # Each seed is a separate trial; P1 is the only player whose persona changes.
-    {
-        "name": "1B_Mistral_Conservative_Temp00_seed42",
-        "label": "Phase 1B - Mistral Conservative vs 3 Neutrals (temp 0.0, seed 42)",
-        "temperature": 0.0,
-        "seed": 42,
-        "players": [
-            {"name": "P1_Conservative", "model": MISTRAL_SMALL, "persona": CONSERVATIVE},
-            {"name": "P2_Neutral", "model": MISTRAL_SMALL, "persona": "Neutral AI"},
-            {"name": "P3_Neutral", "model": MISTRAL_SMALL, "persona": "Neutral AI"},
-            {"name": "P4_Neutral", "model": MISTRAL_SMALL, "persona": "Neutral AI"},
-        ],
-    },
-    {
-        "name": "1B_Gemma_Diplomat_Temp00_seed42",
-        "label": "Phase 1B - Gemma Diplomat vs 3 Neutrals (temp 0.0, seed 42)",
-        "temperature": 0.0,
-        "seed": 42,
-        "players": [
-            {"name": "P1_Diplomat", "model": GEMMA, "persona": DIPLOMAT},
-            {"name": "P2_Neutral", "model": GEMMA, "persona": "Neutral AI"},
-            {"name": "P3_Neutral", "model": GEMMA, "persona": "Neutral AI"},
-            {"name": "P4_Neutral", "model": GEMMA, "persona": "Neutral AI"},
-        ],
-    },
-    {
-        "name": "1B_DeepSeek_Independent_Temp00_seed42",
-        "label": "Phase 1B - DeepSeek Independent vs 3 Neutrals (temp 0.0, seed 42)",
-        "temperature": 0.0,
-        "seed": 42,
-        "num_predict": SERIES0_NUM_PREDICT,
-        "llm_timeout": SERIES0_LLM_TIMEOUT,
-        "think_burn_retry_models": "deepseek",
-        "players": [
-            {"name": "P1_Independent", "model": DEEPSEEK, "persona": INDEPENDENT},
-            {"name": "P2_Neutral", "model": DEEPSEEK, "persona": "Neutral AI"},
-            {"name": "P3_Neutral", "model": DEEPSEEK, "persona": "Neutral AI"},
-            {"name": "P4_Neutral", "model": DEEPSEEK, "persona": "Neutral AI"},
-        ],
-    },
-    {
-        "name": "1B_Qwen_Zen_Temp00_seed42",
-        "label": "Phase 1B - Qwen Zen Drifter vs 3 Neutrals (temp 0.0, seed 42)",
-        "temperature": 0.0,
-        "seed": 42,
-        "num_predict": SERIES0_NUM_PREDICT,
-        "players": [
-            {"name": "P1_Zen", "model": QWEN, "persona": ZEN},
-            {"name": "P2_Neutral", "model": QWEN, "persona": "Neutral AI"},
-            {"name": "P3_Neutral", "model": QWEN, "persona": "Neutral AI"},
-            {"name": "P4_Neutral", "model": QWEN, "persona": "Neutral AI"},
-        ],
-    },
+# --- Phase 1B: one persona at seat 1 vs 3 Neutrals, same model at the table --------
+# Same models, seeds and player names as Series 0 Batch 1 large (S0A-S0D), so each game
+# pairs with the S0 game of the same seed; the only change is P1's persona.
+PERSONA_TABLES = [
+    # (group, label family, model, persona label, persona text, extra config)
+    ("1B_Mistral_Conservative", "Mistral",  MISTRAL_SMALL, "Conservative", CONSERVATIVE, {}),
+    ("1B_Gemma_Diplomat",       "Gemma",    GEMMA,         "Diplomat",     DIPLOMAT,     {}),
+    # No think-burn retry, same as S0/S1: a think-burn ends as a JSON error -> default action.
+    # (The first DeepSeek persona runs used the retry; they are archived in backend/Deepseek_think/.)
+    ("1B_DeepSeek_Independent", "DeepSeek", DEEPSEEK,      "Independent",  INDEPENDENT,  {}),
+    ("1B_Qwen_Zen",             "Qwen",     QWEN,          "Zen Drifter",  ZEN,          {}),
 ]
+
+
+def _persona_experiments(deception=False):
+    """Build the Phase 1B configs (4 personas x 5 seeds = 20 games).
+
+    deception=True is the comparison arm: same games, but every player's prompt has the
+    bluffing block. Its names carry "_DecOn"; the off arm keeps its original names.
+    """
+    out = []
+    tag = "_DecOn" if deception else ""
+    dec_label = ", deception on" if deception else ""
+    for group, family, model, persona_label, persona, extra in PERSONA_TABLES:
+        for seed in SERIES0_SEEDS:
+            out.append({
+                "name": f"{group}_Temp00{tag}_seed{seed}",
+                "label": f"Phase 1B - {family} {persona_label} vs 3 Neutrals (temp 0.0{dec_label}, seed {seed})",
+                "temperature": 0.0,
+                "seed": seed,
+                "rent_frame": "neutral",
+                "deception": deception,  # True adds the [THE ART OF DECEPTION (BLUFFING)] block for all players
+                "num_predict": SERIES0_NUM_PREDICT,
+                "llm_timeout": SERIES0_LLM_TIMEOUT,
+                **extra,
+                "players": [
+                    {"name": f"P{i + 1}_{_safe(model)}", "model": model,
+                     "persona": persona if i == 0 else "Neutral AI"}
+                    for i in range(4)
+                ],
+            })
+    return out
+
+
+def _series0_batch1_decon_experiments(batch=SERIES0_BATCH1):
+    """S0A-S0D with deception on (4x Neutral, 4 groups x 5 seeds = 20 games).
+
+    The Neutral cell of the persona x deception 2x2: pairs with S0A-S0D (Neutral, off)
+    the way 1B_*_DecOn pairs with 1B_*. Only the deception switch differs from the
+    S0A-S0D game of the same seed. Upper-case letters = large models (as in S0A-S0D).
+    batch=SERIES0_BATCH1_SMALL gives the small-model arm, "S0a_Qwen_DecOn_seed42" etc.
+    """
+    out = []
+    for group, model in batch:
+        for seed in SERIES0_SEEDS:
+            out.append({
+                "name": f"{group}_DecOn_seed{seed}",
+                "label": f"Series 0 Batch 1 - {group} family, 4x {model} (deception on, seed {seed})",
+                "temperature": 0.0,
+                "seed": seed,
+                "rent_frame": "neutral",
+                "deception": True,  # True adds the [THE ART OF DECEPTION (BLUFFING)] block for all players
+                "num_predict": SERIES0_NUM_PREDICT,
+                "llm_timeout": SERIES0_LLM_TIMEOUT,
+                "players": [
+                    {"name": f"P{i + 1}_{_safe(model)}", "model": model, "persona": "Neutral AI"}
+                    for i in range(4)
+                ],
+            })
+    return out
+
+
+EXPERIMENTS = _persona_experiments()
+# Deception-on arm: only the deception switch differs from the off arm above.
+EXPERIMENTS.extend(_persona_experiments(deception=True))
 
 # Series 0: 60 configs (12 groups x 5 seeds).
 EXPERIMENTS.extend(_series0_experiments())
+# Deception-on arm of S0A-S0D: 20 configs, names "S0A_Qwen_DecOn_seed42" etc.
+EXPERIMENTS.extend(_series0_batch1_decon_experiments())
+# Deception-on arm of the small tier S0a-S0d: 20 configs, names "S0a_Qwen_DecOn_seed42" etc.
+# Launch filter: '^S0[a-d]_[A-Za-z]+_DecOn_seed[0-9]+$'
+EXPERIMENTS.extend(_series0_batch1_decon_experiments(SERIES0_BATCH1_SMALL))
+
+
+def _series0_batch2_decon_experiments():
+    """S0E-S0H incl. Mirror with deception on (8 groups x 5 seeds = 40 games).
+
+    Copied from the Batch 2 off configs, so models, seats, seed and settings are the
+    same; only the name, the label and the deception switch change.
+    Names: "S0E_Qwen_DecOn_seed42", "S0E_QwenMirror_DecOn_seed42", ...
+    """
+    groups = {group for group, *_ in SERIES0_BATCH2}
+    out = []
+    for cfg in _series0_experiments():
+        group = cfg["name"].rsplit("_seed", 1)[0]
+        if group not in groups:
+            continue
+        on = json.loads(json.dumps(cfg))  # deep copy
+        on["name"] = f"{group}_DecOn_seed{cfg['seed']}"
+        on["label"] = cfg["label"].replace(f"seed {cfg['seed']})", f"deception on, seed {cfg['seed']})")
+        on["deception"] = True  # adds the [THE ART OF DECEPTION (BLUFFING)] block for all players
+        out.append(on)
+    return out
+
+
+# Deception-on arm of S0E-S0H incl. Mirror: 40 configs.
+# Launch filter: '^S0[E-H]_[A-Za-z]+_DecOn_seed[0-9]+$'
+EXPERIMENTS.extend(_series0_batch2_decon_experiments())
+
 
 # --- Series 1: mixed table, one large model per family -----------------------
 SERIES1_D = DEEPSEEK
-SERIES1_G = GEMMA_LARGE
+SERIES1_G = GEMMA
 SERIES1_Q = QWEN
 SERIES1_M = MISTRAL_SMALL
 
@@ -234,6 +298,7 @@ def _series1_experiments():
                 "temperature": 0.0,
                 "seed": seed,
                 "rent_frame": "neutral",
+                "deception": False,  # False drops the [THE ART OF DECEPTION (BLUFFING)] block
                 "num_predict": SERIES0_NUM_PREDICT,
                 "llm_timeout": SERIES0_LLM_TIMEOUT,
                 "players": [
@@ -252,7 +317,7 @@ _LAUNCH_LLM_TIMEOUT = os.environ.get("MAS_LLM_TIMEOUT")
 
 def reset_env():
     """Clear the per-experiment MAS_* settings so nothing leaks into the next game."""
-    for key in ("MAS_TEMPERATURE", "MAS_SEED", "MAS_RENT_FRAME",
+    for key in ("MAS_TEMPERATURE", "MAS_SEED", "MAS_RENT_FRAME", "MAS_DECEPTION",
                 "MAS_NUM_PREDICT", "MAS_THINK_OFF_MODELS",
                 "MAS_SYSTEM_IN_PROMPT_MODELS", "MAS_THINK_BURN_RETRY_MODELS"):
         os.environ.pop(key, None)
@@ -319,13 +384,20 @@ def run_game(cfg, max_turns):
     reset_env()
 
     os.environ["MAS_TEMPERATURE"] = str(cfg["temperature"])
-    # Default legacy so any legacy experiment is unaffected.
-    os.environ["MAS_RENT_FRAME"] = str(cfg.get("rent_frame", "legacy"))
+    # Default neutral; set "rent_frame": "legacy" to get the old waiving-leaning text.
+    os.environ["MAS_RENT_FRAME"] = str(cfg.get("rent_frame", "neutral"))
+    # Deception switch. All three layers point the same way:
+    #   cfg "deception": True          -> MAS_DECEPTION="on"  -> prompt HAS the bluffing block,
+    #                                                            "cunning" and "You CAN lie"
+    #   cfg "deception": False/missing -> MAS_DECEPTION="off" -> prompt has none of them (default)
+    if cfg.get("deception", False):
+        os.environ["MAS_DECEPTION"] = "on"
+    else:
+        os.environ["MAS_DECEPTION"] = "off"
 
-    if cfg.get("num_predict"):
-        os.environ["MAS_NUM_PREDICT"] = str(cfg["num_predict"])
-    if cfg.get("llm_timeout"):
-        os.environ["MAS_LLM_TIMEOUT"] = str(cfg["llm_timeout"])
+    # Every game uses the Series 0 token cap and timeout unless the config overrides them.
+    os.environ["MAS_NUM_PREDICT"] = str(cfg.get("num_predict", SERIES0_NUM_PREDICT))
+    os.environ["MAS_LLM_TIMEOUT"] = str(cfg.get("llm_timeout", SERIES0_LLM_TIMEOUT))
     # gemma4 needs thinking off and the system prompt folded in (see agent.apply_model_compat).
     if any(p["model"].startswith("gemma") for p in cfg["players"]):
         os.environ["MAS_THINK_OFF_MODELS"] = "gemma"
@@ -359,8 +431,13 @@ def run_game(cfg, max_turns):
     dataset = []
     reason = "max turns reached"
     for turn in range(max_turns):
+        log_start = len(state.logs)  # state.logs is append-only
         engine.execute_turn()
-        dataset.append(snapshot(state))
+        snap = snapshot(state)
+        # Every log line of this turn. recent_logs keeps only the last 50 and can miss
+        # the start of a busy turn; it stays for the existing parsers.
+        snap["turn_logs"] = state.logs[log_start:]
+        dataset.append(snap)
 
         if turn % 5 == 0:
             _write_json(log_path, dataset)
